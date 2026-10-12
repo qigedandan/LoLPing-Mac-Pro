@@ -71,6 +71,19 @@ final class GestureTests {
         XCTAssertEqual(machine.moved(to: CGPoint(x: 700, y: 400)), [.hover(.push, angle: .pi/2)])
         XCTAssertEqual(machine.flagsChanged([], at: anchor, otherInputHeld: false), [.dismiss, .commit(.push, anchor)])
     }
+    func testSlotIndexAgreesWithSelection() {
+        // The settings window picks a slot by index; the gesture machine picks by
+        // signal. Both must come from the same maths.
+        let order = PingKind.defaultWheel
+        for (index, _) in order.enumerated() {
+            let angle = WheelGeometry.angle(forIndex: index, count: order.count) + WheelGeometry.step(order.count)*0.3
+            let point = CGPoint(x: sin(angle)*120, y: cos(angle)*120)
+            XCTAssertEqual(WheelGeometry.slotIndex(at: point, center: .zero, deadZone: WheelGeometry.centerRadius, count: order.count), index)
+            XCTAssertEqual(WheelGeometry.selection(at: point, center: .zero, deadZone: WheelGeometry.centerRadius), order[index])
+        }
+        XCTAssertNil(WheelGeometry.slotIndex(at: CGPoint(x: 20, y: 20), center: .zero, deadZone: WheelGeometry.centerRadius, count: order.count))
+        XCTAssertNil(WheelGeometry.slotIndex(at: CGPoint(x: 0, y: 200), center: .zero, deadZone: WheelGeometry.centerRadius, count: 0))
+    }
     func testCompassLabelsMatchTheRingOrder() {
         for (index, name) in ["正上", "右上", "正右", "右下", "正下", "左下", "正左", "左上"].enumerated() {
             XCTAssertEqual(WheelGeometry.compassLabel(forIndex: index, count: 8), name)
@@ -222,6 +235,7 @@ enum Checks {
         let scenarios: [(String, () -> Void)] = [
             ("扇区判定与中央区域", test.testSectorSelectionAndCentralDeadZone),
             ("自定义轮盘驱动悬停与发送", test.testConfiguredRingDrivesHoverAndCommit),
+            ("方位索引与判定一致", test.testSlotIndexAgreesWithSelection),
             ("方位名称与顺序一致", test.testCompassLabelsMatchTheRingOrder),
             ("中央信号可自定义", test.testCentreSignalCanBeAnySignal),
             ("轮盘排布持久化解析", test.testSavedRingLayoutSurvivesPersistence),

@@ -15,6 +15,12 @@ final class OverlayPanel: NSPanel {
     }
 }
 
+/// What the settings window is editing when a wheel preview is clicked.
+enum WheelEditTarget: Equatable {
+    case hub
+    case ring(Int)
+}
+
 private let wheelGold = NSColor(srgbRed: 0.78, green: 0.66, blue: 0.40, alpha: 1)
 private let wheelCyan = NSColor(srgbRed: 0.02, green: 0.81, blue: 0.77, alpha: 1)
 private func clamp01(_ value: Double) -> Double { min(1, max(0, value)) }
@@ -54,7 +60,11 @@ final class WheelView: NSView {
         }
     }
     var onHover: ((PingKind) -> Void)?
-    var onPick: ((PingKind) -> Void)?
+    /// Clicking the hub or a sector reports what was hit, so the settings window
+    /// can point its palette at that slot.
+    var onSelectTarget: ((WheelEditTarget) -> Void)?
+    /// Highlighted slot in editor use; nil for the desktop overlay.
+    var focus: WheelEditTarget?
     private lazy var tracking = NSTrackingArea(rect: .zero,
                                                options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
                                                owner: self, userInfo: nil)
@@ -80,8 +90,19 @@ final class WheelView: NSView {
     }
     override func mouseDown(with event: NSEvent) {
         guard isInteractive else { return }
-        hover(at: convert(event.locationInWindow, from: nil))
-        onPick?(selected)
+        let point = convert(event.locationInWindow, from: nil)
+        hover(at: point)
+        onSelectTarget?(target(at: point))
+    }
+    /// Which slot a point falls in, using the same maths as the real gesture.
+    func target(at point: CGPoint) -> WheelEditTarget {
+        let scale = bounds.width/300
+        let centre = CGPoint(x: bounds.midX, y: bounds.midY)
+        let deadZone = WheelGeometry.centerRadius*scale
+        guard let index = WheelGeometry.slotIndex(at: point, center: centre, deadZone: deadZone, count: order.count) else {
+            return .hub
+        }
+        return .ring(index)
     }
     /// The preview shares the live selection maths, so what you point at in the
     /// settings window is exactly what the real gesture would send.
@@ -163,7 +184,13 @@ final class WheelView: NSView {
             let p = CGPoint(x: c.x+cos(theta)*WheelGeometry.iconRadius*s, y: c.y+sin(theta)*WheelGeometry.iconRadius*s)
             let side = Assets.wheelIconSide(kind, weight: weight, iconScale: iconScale)*s
             let color = mix(kind.wheelIdleTint, kind.tint, weight)
-            Assets.draw(kind, in: CGRect(x: p.x-side/2, y: p.y-side/2, width: side, height: side), color: color)
+            let iconRect = CGRect(x: p.x-side/2, y: p.y-side/2, width: side, height: side)
+            if focus == .ring(index) {
+                // Editor focus: a gold ring around the slot being edited.
+                let halo = NSBezierPath(ovalIn: iconRect.insetBy(dx: -4*s, dy: -4*s))
+                wheelGold.setStroke(); halo.lineWidth = 1.6*s; halo.stroke()
+            }
+            Assets.draw(kind, in: iconRect, color: color)
         }
         let coreRect = CGRect(x: c.x-inner, y: c.y-inner, width: inner*2, height: inner*2)
         let core = NSBezierPath(ovalIn: coreRect)
@@ -176,6 +203,10 @@ final class WheelView: NSView {
         wheelGold.withAlphaComponent(0.70).setStroke(); core.lineWidth = 1.2*s; core.stroke()
         let ring = NSBezierPath(ovalIn: coreRect.insetBy(dx: 3*s, dy: 3*s))
         wheelGold.setStroke(); ring.lineWidth = 1.4*s; ring.stroke()
+        if focus == .hub {
+            let halo = NSBezierPath(ovalIn: coreRect.insetBy(dx: -5*s, dy: -5*s))
+            wheelGold.setStroke(); halo.lineWidth = 1.6*s; halo.stroke()
+        }
         if let angle = direction {
             let theta = CGFloat.pi/2-angle
             func point(_ radius: CGFloat, _ offset: CGFloat = 0) -> CGPoint {

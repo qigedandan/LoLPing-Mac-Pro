@@ -268,17 +268,26 @@ public enum WheelGeometry {
         guard hypot(dx, dy) > deadZone else { return nil }
         return atan2(dx, dy)
     }
-    /// Coordinates use the AppKit convention: y increases upwards. `centreSignal`
-    /// is what a plain press sends, so it can be any signal the user picked.
+    /// Slot under a point, clockwise from north; nil means the hub. Coordinates
+    /// use the AppKit convention: y increases upwards.
+    public static func slotIndex(at point: CGPoint, center: CGPoint, deadZone: CGFloat, count: Int) -> Int? {
+        guard count > 0 else { return nil }
+        let dx = point.x - center.x, dy = point.y - center.y
+        guard hypot(dx, dy) > deadZone else { return nil }
+        let step = step(count)
+        let index = Int(floor((atan2(dx, dy) + step / 2) / step))
+        return (index % count + count) % count
+    }
+    /// `centreSignal` is what a plain press sends, so it can be any signal the
+    /// user picked — including an emote.
     public static func selection(at point: CGPoint, center: CGPoint, deadZone: CGFloat,
                                  order: [PingKind] = PingKind.defaultWheel,
                                  centreSignal: PingKind = .generic) -> PingKind {
-        let dx = point.x - center.x, dy = point.y - center.y
-        guard hypot(dx, dy) > deadZone, !order.isEmpty else { return centreSignal }
-        let clockwiseFromNorth = atan2(dx, dy)
-        let step = step(order.count)
-        let index = Int(floor((clockwiseFromNorth + step / 2) / step))
-        return order[(index % order.count + order.count) % order.count]
+        guard !order.isEmpty else { return centreSignal }
+        guard let index = slotIndex(at: point, center: center, deadZone: deadZone, count: order.count) else {
+            return centreSignal
+        }
+        return order[index]
     }
 
     public static func clampedCenter(anchor: CGPoint, frame: CGRect, radius: CGFloat) -> CGPoint {
