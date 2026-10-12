@@ -15,6 +15,26 @@ final class AppModel: ObservableObject {
     @Published var scale: Double {
         didSet { defaults.set(scale, forKey: "effectScale"); restartInputIfNeeded() }
     }
+    /// How large the ring is drawn, independent of the landing effect. The centre
+    /// dead zone follows this, so the invisible circle always matches the visual one.
+    @Published var wheelScale: Double {
+        didSet { defaults.set(wheelScale, forKey: "wheelScale"); restartInputIfNeeded() }
+    }
+    /// Multiplier for the icons inside the ring; emotes carry detail, so they are
+    /// often easier to read a little larger.
+    @Published var iconScale: Double {
+        didSet { defaults.set(iconScale, forKey: "iconScale"); cancelEffects() }
+    }
+    /// What a plain press sends — the game's ordinary ping by default, but the
+    /// settings window can put any signal or emote in the hub.
+    @Published var centreSignal: PingKind {
+        didSet {
+            guard centreSignal != oldValue else { return }
+            defaults.set(centreSignal.rawValue, forKey: "centreSignal")
+            input.machine.centreSignal = centreSignal
+            cancelEffects()
+        }
+    }
     /// The ring layout: slot 0 on north, then clockwise. Editable in the settings
     /// window; the overlay and the selection maths both read it.
     @Published var wheelOrder: [PingKind] {
@@ -46,6 +66,9 @@ final class AppModel: ObservableObject {
         chord = TriggerChord(rawValue: defaults.string(forKey: "triggerChord") ?? "") ?? .controlOptionCommand
         volume = defaults.object(forKey: "volume") == nil ? 0.55 : min(max(defaults.double(forKey: "volume"), 0), 1)
         scale = defaults.object(forKey: "effectScale") == nil ? 1 : min(max(defaults.double(forKey: "effectScale"), 0.75), 1.5)
+        wheelScale = defaults.object(forKey: "wheelScale") == nil ? 1 : min(max(defaults.double(forKey: "wheelScale"), 0.75), 2.5)
+        iconScale = defaults.object(forKey: "iconScale") == nil ? 1 : min(max(defaults.double(forKey: "iconScale"), 0.8), 1.8)
+        centreSignal = PingKind(rawValue: defaults.string(forKey: "centreSignal") ?? "") ?? .generic
         wheelOrder = Self.loadWheelOrder(from: defaults)
         input.onAction = { [weak self] action in self?.handle(action) }
         input.onUnavailable = { [weak self] in
@@ -87,7 +110,7 @@ final class AppModel: ObservableObject {
             return
         }
         do {
-            try input.start(chord: chord, scale: scale, order: wheelOrder)
+            try input.start(chord: chord, deadZoneScale: wheelScale, order: wheelOrder, centreSignal: centreSignal)
             isEnabled = true; awaitingPermission = false
             permissionTimer?.invalidate(); permissionTimer = nil
             defaults.set(true, forKey: "enabled")
@@ -165,7 +188,7 @@ final class AppModel: ObservableObject {
     private func handle(_ action: GestureMachine.Action) {
         guard isEnabled else { return }
         switch action {
-        case .show(let anchor): input.setWheelCenter(overlay.showWheel(at: anchor, scale: scale, order: wheelOrder))
+        case .show(let anchor): input.setWheelCenter(overlay.showWheel(at: anchor, scale: wheelScale, iconScale: iconScale, order: wheelOrder, centreSignal: centreSignal))
         case .hover(let kind, let angle): overlay.select(kind, angle: angle)
         case .hide: overlay.hideWheel(animated: false)
         case .dismiss: overlay.hideWheel()

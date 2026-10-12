@@ -260,11 +260,13 @@ public enum WheelGeometry {
         guard hypot(dx, dy) > deadZone else { return nil }
         return atan2(dx, dy)
     }
-    /// Coordinates use the AppKit convention: y increases upwards.
+    /// Coordinates use the AppKit convention: y increases upwards. `centreSignal`
+    /// is what a plain press sends, so it can be any signal the user picked.
     public static func selection(at point: CGPoint, center: CGPoint, deadZone: CGFloat,
-                                 order: [PingKind] = PingKind.defaultWheel) -> PingKind {
+                                 order: [PingKind] = PingKind.defaultWheel,
+                                 centreSignal: PingKind = .generic) -> PingKind {
         let dx = point.x - center.x, dy = point.y - center.y
-        guard hypot(dx, dy) > deadZone, !order.isEmpty else { return .generic }
+        guard hypot(dx, dy) > deadZone, !order.isEmpty else { return centreSignal }
         let clockwiseFromNorth = atan2(dx, dy)
         let step = step(order.count)
         let index = Int(floor((clockwiseFromNorth + step / 2) / step))

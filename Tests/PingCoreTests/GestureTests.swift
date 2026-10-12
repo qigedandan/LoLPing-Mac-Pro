@@ -71,6 +71,19 @@ final class GestureTests {
         XCTAssertEqual(machine.moved(to: CGPoint(x: 700, y: 400)), [.hover(.push, angle: .pi/2)])
         XCTAssertEqual(machine.flagsChanged([], at: anchor, otherInputHeld: false), [.dismiss, .commit(.push, anchor)])
     }
+    func testCentreSignalCanBeAnySignal() {
+        let machine = GestureMachine()
+        machine.centreSignal = .unworthyCn
+        open(machine)
+        XCTAssertEqual(machine.selected, .unworthyCn)
+        XCTAssertEqual(machine.moved(to: CGPoint(x: anchor.x+2, y: anchor.y)), [.hover(.unworthyCn, angle: nil)])
+        XCTAssertEqual(machine.flagsChanged([], at: anchor, otherInputHeld: false), [.dismiss, .commit(.unworthyCn, anchor)])
+        // The pure geometry agrees, so the drawn hub and the sent signal match.
+        XCTAssertEqual(WheelGeometry.selection(at: CGPoint(x: 10, y: 10), center: .zero,
+                                               deadZone: WheelGeometry.centerRadius, centreSignal: .facepalm), .facepalm)
+        XCTAssertEqual(WheelGeometry.selection(at: CGPoint(x: 10, y: 10), center: .zero,
+                                               deadZone: WheelGeometry.centerRadius), .generic)
+    }
     func testSavedRingLayoutSurvivesPersistence() {
         // What the settings window writes must decode back to the same ring.
         XCTAssertEqual(PingKind.decodeWheelOrder(PingKind.defaultWheel.map(\.rawValue)), PingKind.defaultWheel)
@@ -201,6 +214,7 @@ enum Checks {
         let scenarios: [(String, () -> Void)] = [
             ("扇区判定与中央区域", test.testSectorSelectionAndCentralDeadZone),
             ("自定义轮盘驱动悬停与发送", test.testConfiguredRingDrivesHoverAndCommit),
+            ("中央信号可自定义", test.testCentreSignalCanBeAnySignal),
             ("轮盘排布持久化解析", test.testSavedRingLayoutSurvivesPersistence),
             ("短按不触发", test.testShortPressNeverPingsAndLateTimerDoesNothing),
             ("一次发送及原始落点", test.testReleaseCommitsExactlyOnceAtOriginalAnchor),

@@ -15,6 +15,9 @@ public final class GestureMachine {
     public var deadZone: CGFloat = WheelGeometry.centerRadius
     /// The ring the user configured: slot 0 on north, then clockwise.
     public var wheelOrder: [PingKind] = PingKind.defaultWheel
+    /// Sent by a plain press with no direction chosen. Defaults to the game's
+    /// ordinary ping; the settings window can put any signal here.
+    public var centreSignal: PingKind = .generic
     private var center: CGPoint = .zero
     private var pointer: CGPoint = .zero
     public init() {}
@@ -28,7 +31,7 @@ public final class GestureMachine {
         if phase == .idle {
             guard flags == chord.modifiers else { return [] }
             guard !otherInputHeld else { phase = .blocked; return [] }
-            anchor = point; center = point; pointer = point; selected = .generic
+            anchor = point; center = point; pointer = point; selected = centreSignal
             phase = .arming
             return [.arm(point)]
         }
@@ -58,7 +61,7 @@ public final class GestureMachine {
     public func moved(to point: CGPoint) -> [Action] {
         pointer = point
         guard phase == .open else { return [] }
-        let next = WheelGeometry.selection(at: point, center: center, deadZone: deadZone, order: wheelOrder)
+        let next = WheelGeometry.selection(at: point, center: center, deadZone: deadZone, order: wheelOrder, centreSignal: centreSignal)
         selected = next
         return [.hover(next, angle: WheelGeometry.direction(at: point, center: center, deadZone: deadZone))]
     }
@@ -66,13 +69,13 @@ public final class GestureMachine {
     public func cancel() -> [Action] {
         let hadGesture = phase == .arming || phase == .open
         phase = currentModifiers.intersection(chord.modifiers).isEmpty ? .idle : .blocked
-        selected = .generic
+        selected = centreSignal
         return hadGesture ? [.hide] : []
     }
 
     public func reset(blockUntilRelease: Bool = false) {
         phase = blockUntilRelease ? .blocked : .idle
-        selected = .generic
+        selected = centreSignal
         currentModifiers = []
     }
 }

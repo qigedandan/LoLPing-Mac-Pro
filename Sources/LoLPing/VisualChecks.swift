@@ -74,6 +74,31 @@ enum VisualChecks {
             }
         }
         try save(phases, to: directory.appendingPathComponent("effect-phases-retina.png"))
+        // The size controls: one emote ring at three wheel/icon settings, so the
+        // readability range is visible without triggering the real gesture.
+        // Three sizes of one emote slot, then the same emote sitting in the hub.
+        let sizes: [(wheel: Double, icon: Double)] = [(1.0, 1.0), (1.5, 1.4), (2.0, 1.8), (1.5, 1.4)]
+        let cell = CGFloat(300*2.0)+CGFloat(30)
+        let settings = bitmap(size: CGSize(width: cell*CGFloat(sizes.count), height: cell)) {
+            for (index, pair) in sizes.enumerated() {
+                let side = CGFloat(300*pair.wheel)
+                let view = WheelView(frame: CGRect(x: 0, y: 0, width: side, height: side))
+                view.order = ringSample
+                view.iconScale = CGFloat(pair.icon)
+                let inHub = index == sizes.count-1
+                if inHub {
+                    view.centreSignal = .unworthyCn
+                    view.setSelection(.unworthyCn, angle: nil, animated: false)
+                } else {
+                    view.setSelection(.unworthyCn,
+                                      angle: WheelGeometry.angle(forIndex: ringSample.count-1, count: ringSample.count),
+                                      animated: false)
+                }
+                let inset = (cell-side)/2
+                draw(view, at: CGPoint(x: CGFloat(index)*cell+inset, y: inset))
+            }
+        }
+        try save(settings, to: directory.appendingPathComponent("wheel-large-retina.png"))
         try movie(to: directory.appendingPathComponent("LoLPing-effects-demo.mov"))
         print("Visual snapshots and renderer demo saved: \(directory.path)")
     }

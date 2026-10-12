@@ -29,12 +29,15 @@ final class GlobalInput {
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
-    func start(chord: TriggerChord, scale: Double, order: [PingKind]) throws {
+    /// `deadZoneScale` is the wheel size: the invisible centre circle must match
+    /// what the ring actually draws.
+    func start(chord: TriggerChord, deadZoneScale: Double, order: [PingKind], centreSignal: PingKind) throws {
         stop()
         guard Self.isTrusted else { throw StartError.permission }
         machine.chord = chord
         machine.wheelOrder = order.isEmpty ? PingKind.defaultWheel : order
-        machine.deadZone = WheelGeometry.centerRadius*scale
+        machine.centreSignal = centreSignal
+        machine.deadZone = WheelGeometry.centerRadius*deadZoneScale
         machine.reset(blockUntilRelease: !Self.modifiers(CGEventSource.flagsState(.combinedSessionState)).intersection(chord.modifiers).isEmpty)
         let types: [CGEventType] = [.flagsChanged, .keyDown, .keyUp, .mouseMoved,
                                    .leftMouseDown, .leftMouseUp, .leftMouseDragged,

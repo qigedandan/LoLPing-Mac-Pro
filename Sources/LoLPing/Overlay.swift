@@ -32,6 +32,10 @@ private func text(_ string: String, at center: CGPoint, size: CGFloat, color: NS
 final class WheelView: NSView {
     private(set) var selected: PingKind = .generic
     private(set) var direction: CGFloat?
+    /// User-controlled multiplier for the icons drawn in the ring.
+    var iconScale: CGFloat = 1
+    /// What a plain press sends; drawn in the hub, and treated as "no direction".
+    var centreSignal: PingKind = .generic
     /// Slot 0 on north, then clockwise. Set before `open()`.
     var order: [PingKind] = PingKind.defaultWheel {
         didSet { if order.count != weights.count { weights = order.map { _ in 0.0 }; origins = weights } }
@@ -92,7 +96,7 @@ final class WheelView: NSView {
 
     func open() { openingStart = CACurrentMediaTime(); startTimer() }
     func setSelection(_ kind: PingKind, angle: CGFloat?, animated: Bool = true) {
-        direction = kind == .generic ? nil : angle
+        direction = kind == centreSignal ? nil : angle
         if !animated {
             selected = kind; weights = order.map { $0 == kind ? 1 : 0 }
             origins = weights; transitionStart = 0; stop(); needsDisplay = true
@@ -157,14 +161,14 @@ final class WheelView: NSView {
             divider.line(to: CGPoint(x: c.x+cos(boundary)*outer, y: c.y+sin(boundary)*outer))
             wheelGold.withAlphaComponent(0.30).setStroke(); divider.lineWidth = 0.55*s; divider.stroke()
             let p = CGPoint(x: c.x+cos(theta)*WheelGeometry.iconRadius*s, y: c.y+sin(theta)*WheelGeometry.iconRadius*s)
-            let side = Assets.wheelIconSide(kind, weight: weight)*s
+            let side = Assets.wheelIconSide(kind, weight: weight, iconScale: iconScale)*s
             let color = mix(kind.wheelIdleTint, kind.tint, weight)
             Assets.draw(kind, in: CGRect(x: p.x-side/2, y: p.y-side/2, width: side, height: side), color: color)
         }
         let coreRect = CGRect(x: c.x-inner, y: c.y-inner, width: inner*2, height: inner*2)
         let core = NSBezierPath(ovalIn: coreRect)
         NSColor(white: 0.025, alpha: 0.94).setFill(); core.fill()
-        if selected == .generic {
+        if selected == centreSignal {
             context.saveGState(); core.addClip()
             NSGradient(colors: [NSColor(white: 0.03, alpha: 0), wheelCyan.withAlphaComponent(0.19)])?.draw(fromCenter: c, radius: 0, toCenter: c, radius: inner, options: [])
             context.restoreGState()
@@ -185,9 +189,11 @@ final class WheelView: NSView {
             arc.appendArc(withCenter: c, radius: inner-7*s, startAngle: degrees-18, endAngle: degrees+18)
             wheelCyan.setStroke(); arc.lineWidth = 1.8*s; arc.stroke()
         }
-        if selected == .generic {
-            Assets.draw(.generic, in: CGRect(x: c.x-11*s, y: c.y+18*s, width: 22*s, height: 22*s))
-            text("信号", at: CGPoint(x: c.x, y: c.y+1*s), size: 13*s, color: PingKind.generic.tint, weight: .semibold)
+        if selected == centreSignal {
+            let hub = (Assets.badge(centreSignal) != nil ? 30 : 22)*s*min(iconScale, 1.3)
+            Assets.draw(centreSignal, in: CGRect(x: c.x-hub/2, y: c.y+15*s, width: hub, height: hub))
+            text(centreSignal == .generic ? "信号" : centreSignal.title, at: CGPoint(x: c.x, y: c.y-3*s),
+                 size: 13*s, color: centreSignal.tint, weight: .semibold)
         } else {
             text(selected.title, at: c, size: 13*s, color: selected.tint, weight: .semibold)
         }
@@ -265,7 +271,7 @@ final class PingEffectView: NSView {
         else if t < 0.25 { pop = 1.08-0.08*ease((t-0.12)/0.13) }
         else { pop = 1 }
         let lift = CGFloat(9*ease(t/0.30)+2*sin(min(t,1.4)*Double.pi))*s
-        let side = CGFloat(43*pop)*s
+        let side = Assets.effectIconSide(kind)*CGFloat(pop)*s
         let rect = CGRect(x: ground.x-side/2, y: ground.y+8*s+lift, width: side, height: side)
         // Separate glow and crisp foreground silhouette; never blur the icon body.
         context.saveGState(); context.setAlpha(CGFloat(alpha)*0.40)
@@ -283,7 +289,9 @@ final class OverlayController {
     private var wheelView: WheelView?
     private var retiring: [(OverlayPanel, DispatchWorkItem)] = []
     private var effects: [(UUID, OverlayPanel, DispatchWorkItem)] = []
-    @discardableResult func showWheel(at anchor: CGPoint, scale: Double, order: [PingKind] = PingKind.defaultWheel) -> CGPoint {
+    @discardableResult func showWheel(at anchor: CGPoint, scale: Double, iconScale: Double = 1,
+                                      order: [PingKind] = PingKind.defaultWheel,
+                                      centreSignal: PingKind = .generic) -> CGPoint {
         hideWheel(animated: false)
         let side = CGFloat(300*scale)
         let screen = NSScreen.screens.first(where: { NSMouseInRect(anchor, $0.frame, false) }) ?? NSScreen.main
@@ -291,6 +299,8 @@ final class OverlayController {
         let panel = OverlayPanel(frame: CGRect(x: center.x-side/2, y: center.y-side/2, width: side, height: side))
         let view = WheelView(frame: CGRect(x: 0, y: 0, width: side, height: side))
         view.order = order.isEmpty ? PingKind.defaultWheel : order
+        view.iconScale = CGFloat(iconScale)
+        view.centreSignal = centreSignal
         panel.contentView = view; panel.orderFrontRegardless(); view.open()
         wheel = panel; wheelView = view
         return center

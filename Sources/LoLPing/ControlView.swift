@@ -93,6 +93,25 @@ struct ControlView: View {
                     Slider(value: $model.scale, in: 0.75...1.5, step: 0.05).accessibilityLabel("效果大小")
                 }
             }
+            HStack(spacing: 28) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Label("轮盘大小", systemImage: "circle.dashed")
+                        Spacer(); Text("\(Int(model.wheelScale*100))%")
+                    }.font(.system(size: 11)).foregroundStyle(Palette.secondary)
+                    Slider(value: $model.wheelScale, in: 0.75...2.5, step: 0.05).accessibilityLabel("轮盘大小")
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Label("图标大小", systemImage: "photo")
+                        Spacer(); Text("\(Int(model.iconScale*100))%")
+                    }.font(.system(size: 11)).foregroundStyle(Palette.secondary)
+                    Slider(value: $model.iconScale, in: 0.8...1.8, step: 0.05).accessibilityLabel("图标大小")
+                }
+            }
+            Text("轮盘大小同时决定中央「普通信号」判定圈的大小；图标大小只影响轮盘里的图标。表情（比如弱爆）默认就比线稿信号画得大，看不清就再放大这两项。")
+                .font(.system(size: 10)).foregroundStyle(Palette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Text("按住 0.18 秒 → 移动选择 → 松开发送　 ·　 Esc / 右键取消")
                 .font(.system(size: 10)).foregroundStyle(Palette.secondary)
         }.padding(16).card()
@@ -143,9 +162,19 @@ struct ControlView: View {
                 Spacer()
                 Text("第 1 位在正上方，顺时针排列").font(.system(size: 10)).foregroundStyle(Palette.secondary)
             }
+            HStack(spacing: 8) {
+                Text("中央").font(.system(size: 11, design: .monospaced)).foregroundStyle(Palette.secondary)
+                    .frame(width: 32, alignment: .trailing)
+                if let icon = Assets.icon(model.centreSignal) { Image(nsImage: icon).resizable().frame(width: 20, height: 20) }
+                Picker("中央信号", selection: $model.centreSignal) {
+                    Section("游戏信号") { ForEach(PingKind.alerts + [PingKind.generic]) { Text($0.title).tag($0) } }
+                    Section("表情") { ForEach(PingKind.emotes) { Text($0.title).tag($0) } }
+                }.labelsHidden().frame(width: 210).accessibilityLabel("中央信号")
+                Text("不选方向、直接松开时发送的信号").font(.system(size: 10)).foregroundStyle(Palette.secondary)
+            }
             HStack(alignment: .top, spacing: 16) {
                 VStack(spacing: 6) {
-                    WheelPreview(order: model.wheelOrder) { kind in
+                    WheelPreview(order: model.wheelOrder, centreSignal: model.centreSignal) { kind in
                         model.preview(kind)
                     } onHover: { kind in
                         pointed = kind
@@ -252,23 +281,26 @@ private struct PreviewGrid: Shape {
 /// desktop overlay, driven by the mouse instead of the trigger chord.
 private struct WheelPreview: NSViewRepresentable {
     let order: [PingKind]
+    let centreSignal: PingKind
     let onPick: (PingKind) -> Void
     let onHover: (PingKind) -> Void
     func makeNSView(context: Context) -> WheelView {
         let view = WheelView(frame: NSRect(x: 0, y: 0, width: 240, height: 240))
         view.isInteractive = true
         view.order = order
+        view.centreSignal = centreSignal
         view.onPick = onPick
         view.onHover = onHover
-        view.setSelection(.generic, angle: nil, animated: false)
+        view.setSelection(centreSignal, angle: nil, animated: false)
         return view
     }
     func updateNSView(_ view: WheelView, context: Context) {
         view.order = order
+        view.centreSignal = centreSignal
         view.onPick = onPick
         view.onHover = onHover
         // A changed layout invalidates whatever the pointer was pointing at.
-        view.setSelection(.generic, angle: nil, animated: false)
+        view.setSelection(centreSignal, angle: nil, animated: false)
         view.needsDisplay = true
     }
 }

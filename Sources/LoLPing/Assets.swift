@@ -75,11 +75,13 @@ enum Assets {
     })
     static func icon(_ kind: PingKind) -> NSImage? { icons[kind] }
     static func badge(_ kind: PingKind) -> NSImage? { badges[kind] }
-    /// Emote art needs a little more room than a flat silhouette to stay legible
-    /// in a wheel sector, and it grows by the same highlight step.
-    static func wheelIconSide(_ kind: PingKind, weight: Double) -> CGFloat {
-        CGFloat(badges[kind] != nil ? 30 : 22) + 8*CGFloat(weight)
+    /// Emote art is detailed and needs more room than a flat silhouette; the
+    /// highlight step and the user's icon-size setting both scale it.
+    static func wheelIconSide(_ kind: PingKind, weight: Double, iconScale: CGFloat = 1) -> CGFloat {
+        (CGFloat(badges[kind] != nil ? 34 : 22) + 8*CGFloat(weight)) * iconScale
     }
+    /// Emotes land larger at the ping point too, since the art carries the joke.
+    static func effectIconSide(_ kind: PingKind) -> CGFloat { badges[kind] != nil ? 58 : 43 }
     static func sound(_ kind: PingKind) -> URL { root.appendingPathComponent("Sounds/\(kind.soundName).mp3") }
     static var missingFiles: [String] {
         PingKind.allCases.flatMap { kind -> [String] in
