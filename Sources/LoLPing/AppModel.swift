@@ -142,8 +142,11 @@ final class AppModel: ObservableObject {
               let order = PingKind.decodeWheelOrder(raw, minimumSlots: minWheelSlots) else { return PingKind.defaultWheel }
         return order
     }
-    /// Signals the ring currently leaves out, in the game's own order.
-    var unusedSignals: [PingKind] { PingKind.ring.filter { !wheelOrder.contains($0) } }
+    /// Signals used nowhere yet — neither on the ring nor in the hub — in the
+    /// game's own order. The slot pickers still offer every signal.
+    var unusedSignals: [PingKind] {
+        PingKind.ring.filter { !wheelOrder.contains($0) && $0 != centreSignal }
+    }
     func setWheelSlot(_ index: Int, to kind: PingKind) {
         guard wheelOrder.indices.contains(index), PingKind.ring.contains(kind) else { return }
         var order = wheelOrder; order[index] = kind; wheelOrder = order
