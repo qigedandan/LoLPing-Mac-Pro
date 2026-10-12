@@ -3,7 +3,7 @@
   "imageSource": "https://raw.communitydragon.org/15.24/game/assets/ux/menu/",
   "officialReference": "https://support.riotgames.com/en-us/league-of-legends/gameplay/smart-ping",
   "soundRevision": "f10d7a448f56bfeb35dd8e49dae78c7e8ab9bc8b",
-  "soundSource": "https://raw.githubusercontent.com/alibaztomars/lol-ping-overlay/f10d7a448f56bfeb35dd8e49dae78c7e8ab9bc8b/sounds/",
+  "soundSource": "Game audio extracted from Common.wad.client by darrenprx/lolPing (Wwise events Play_sfx_hud_base_Pings_*), transcoded to mp3 for AVAudioPlayer. sounds/weak.mp3 is the \u5f31\u7206 emote voice (unworthy_cn.ogg).",
   "soundNotice": "Community audio; equivalence to original Riot recordings is unverified.",
   "files": [
     {
@@ -216,5 +216,30 @@
         41
       ]
     }
+  },
+  "signals": "Ten signals: Riot's eight alerts plus a local \u5f31\u7206 (Weak) taunt. The default ring puts \u5f31\u7206 on north in place of the retreat alert and is editable in the app.",
+  "referenceProject": {
+    "repo": "https://github.com/darrenprx/lolPing",
+    "usedFor": "\u7d20\u6750 only: emote art and the WAD-extracted game audio. Its UI and features are not used.",
+    "notice": "Riot Games material, extracted from a local League install by that project's tools/extract-assets."
+  },
+  "emoteSource": {
+    "leagueEmoteId": 3239,
+    "name": "\u5f31\u7206\uff08\u6587\u5b57\u7248\uff09/ Unworthy (Chinese text)",
+    "url": "https://github.com/darrenprx/lolPing/blob/main/assets/emotes/unworthy_cn.png",
+    "path": "Artwork/weak-emote.png",
+    "note": "128x128 baked RGBA from the summoner-emote effect; the thumbs-up variant (id 3236) exists in the same folder."
+  },
+  "soundMapping": {
+    "retreat.mp3": "SRP_12",
+    "push.mp3": "SRP_9",
+    "on_my_way.mp3": "OnMyWay",
+    "all_in.mp3": "SRP_4",
+    "assist_me.mp3": "ComeHere",
+    "need_vision.mp3": "SRP_7",
+    "q_mark.mp3": "MIA",
+    "enemy_vision.mp3": "AreaIsWarded",
+    "alert.mp3": "Base",
+    "weak.mp3": "emotes/unworthy_cn.ogg"
   }
 }

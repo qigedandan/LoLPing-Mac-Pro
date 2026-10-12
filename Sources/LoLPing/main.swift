@@ -17,7 +17,11 @@ if CommandLine.arguments.contains("--check-assets") {
             print("\(kind.title): image=\(Assets.icon(kind)?.size ?? .zero), sound=\(String(format: "%.2f", player.duration))s")
         } catch { failures.append("\(kind.soundName): \(error.localizedDescription)") }
     }
-    if failures.isEmpty { print("All 9 icons and 9 audio files decode successfully."); exit(0) }
+    if failures.isEmpty {
+        let count = PingKind.allCases.count
+        print("All \(count) icons and \(count) audio files decode successfully.")
+        exit(0)
+    }
     failures.forEach { print($0) }; exit(1)
 }
 

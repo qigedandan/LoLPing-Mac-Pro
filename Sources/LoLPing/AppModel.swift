@@ -15,6 +15,20 @@ final class AppModel: ObservableObject {
     @Published var scale: Double {
         didSet { defaults.set(scale, forKey: "effectScale"); restartInputIfNeeded() }
     }
+    /// The ring layout: slot 0 on north, then clockwise. Editable in the settings
+    /// window; the overlay and the selection maths both read it.
+    @Published var wheelOrder: [PingKind] {
+        didSet {
+            guard wheelOrder != oldValue else { return }
+            defaults.set(wheelOrder.map(\.rawValue), forKey: Self.wheelOrderKey)
+            // A running gesture machine keeps its own copy; no need to rebuild the
+            // event tap, but any wheel already on screen is now out of date.
+            input.machine.wheelOrder = wheelOrder
+            cancelEffects()
+        }
+    }
+    static let wheelOrderKey = "wheelOrder"
+    static let minWheelSlots = 3
     @Published private(set) var previewKind: PingKind = .missing
     @Published private(set) var previewToken = UUID()
     @Published private(set) var previewVisible = false
@@ -32,6 +46,7 @@ final class AppModel: ObservableObject {
         chord = TriggerChord(rawValue: defaults.string(forKey: "triggerChord") ?? "") ?? .controlOptionCommand
         volume = defaults.object(forKey: "volume") == nil ? 0.55 : min(max(defaults.double(forKey: "volume"), 0), 1)
         scale = defaults.object(forKey: "effectScale") == nil ? 1 : min(max(defaults.double(forKey: "effectScale"), 0.75), 1.5)
+        wheelOrder = Self.loadWheelOrder(from: defaults)
         input.onAction = { [weak self] action in self?.handle(action) }
         input.onUnavailable = { [weak self] in
             self?.setEnabled(false)
@@ -72,7 +87,7 @@ final class AppModel: ObservableObject {
             return
         }
         do {
-            try input.start(chord: chord, scale: scale)
+            try input.start(chord: chord, scale: scale, order: wheelOrder)
             isEnabled = true; awaitingPermission = false
             permissionTimer?.invalidate(); permissionTimer = nil
             defaults.set(true, forKey: "enabled")
@@ -97,6 +112,35 @@ final class AppModel: ObservableObject {
     func openInputMonitoring() {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!)
     }
+    // MARK: - Ring layout
+
+    private static func loadWheelOrder(from defaults: UserDefaults) -> [PingKind] {
+        guard let raw = defaults.array(forKey: wheelOrderKey) as? [String],
+              let order = PingKind.decodeWheelOrder(raw, minimumSlots: minWheelSlots) else { return PingKind.defaultWheel }
+        return order
+    }
+    /// Signals the ring currently leaves out, in the game's own order.
+    var unusedSignals: [PingKind] { PingKind.ring.filter { !wheelOrder.contains($0) } }
+    func setWheelSlot(_ index: Int, to kind: PingKind) {
+        guard wheelOrder.indices.contains(index), PingKind.ring.contains(kind) else { return }
+        var order = wheelOrder; order[index] = kind; wheelOrder = order
+    }
+    func addWheelSlot() {
+        guard let next = unusedSignals.first else { return }
+        wheelOrder.append(next)
+    }
+    func removeWheelSlot(at index: Int) {
+        guard wheelOrder.count > Self.minWheelSlots, wheelOrder.indices.contains(index) else { return }
+        wheelOrder.remove(at: index)
+    }
+    func rotateWheelSlot(_ index: Int, by offset: Int) {
+        guard wheelOrder.indices.contains(index), wheelOrder.count > 1 else { return }
+        var order = wheelOrder
+        let target = (index+offset+order.count) % order.count
+        order.swapAt(index, target); wheelOrder = order
+    }
+    func resetWheelOrder() { wheelOrder = PingKind.defaultWheel }
+
     func preview(_ kind: PingKind) {
         previewCleanup?.cancel()
         previewKind = kind; previewToken = UUID(); previewVisible = true
@@ -121,7 +165,7 @@ final class AppModel: ObservableObject {
     private func handle(_ action: GestureMachine.Action) {
         guard isEnabled else { return }
         switch action {
-        case .show(let anchor): input.setWheelCenter(overlay.showWheel(at: anchor, scale: scale))
+        case .show(let anchor): input.setWheelCenter(overlay.showWheel(at: anchor, scale: scale, order: wheelOrder))
         case .hover(let kind, let angle): overlay.select(kind, angle: angle)
         case .hide: overlay.hideWheel(animated: false)
         case .dismiss: overlay.hideWheel()

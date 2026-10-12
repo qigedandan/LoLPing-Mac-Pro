@@ -29,10 +29,11 @@ final class GlobalInput {
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
-    func start(chord: TriggerChord, scale: Double) throws {
+    func start(chord: TriggerChord, scale: Double, order: [PingKind]) throws {
         stop()
         guard Self.isTrusted else { throw StartError.permission }
         machine.chord = chord
+        machine.wheelOrder = order.isEmpty ? PingKind.defaultWheel : order
         machine.deadZone = WheelGeometry.centerRadius*scale
         machine.reset(blockUntilRelease: !Self.modifiers(CGEventSource.flagsState(.combinedSessionState)).intersection(chord.modifiers).isEmpty)
         let types: [CGEventType] = [.flagsChanged, .keyDown, .keyUp, .mouseMoved,

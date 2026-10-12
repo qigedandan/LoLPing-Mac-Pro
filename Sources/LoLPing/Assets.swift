@@ -10,6 +10,14 @@ enum Assets {
             .deletingLastPathComponent().appendingPathComponent("Resources")
     }()
     private struct Vector: Decodable { let contours: [[[CGFloat]]] }
+    /// Signals drawn as emote art instead of a traced silhouette. The image is a
+    /// 128x128 baked RGBA emote from `darrenprx/lolPing` (see asset-sources.json).
+    private static let badgeFiles: [PingKind: String] = [.weak: "Artwork/weak-emote.png"]
+    static let badges: [PingKind: NSImage] = Dictionary(uniqueKeysWithValues: badgeFiles.compactMap { kind, path in
+        guard let image = NSImage(contentsOf: root.appendingPathComponent(path)) else { return nil }
+        image.isTemplate = false
+        return (kind, image)
+    })
     static let paths: [PingKind: CGPath] = {
         guard let data = try? Data(contentsOf: root.appendingPathComponent("Artwork/ping-vectors.json")),
               let vectors = try? JSONDecoder().decode([String: Vector].self, from: data) else { return [:] }
@@ -41,19 +49,35 @@ enum Assets {
         return paths[kind]?.copy(using: &transform)
     }
     static func draw(_ kind: PingKind, in rect: CGRect, color: NSColor? = nil) {
-        guard let context = NSGraphicsContext.current?.cgContext, let path = path(kind, in: rect) else { return }
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        if let badge = badges[kind] {
+            // Emote art keeps its own colours, so it is drawn as a cutout with
+            // the signal glow behind it rather than tinted like a silhouette.
+            context.saveGState()
+            context.setShadow(offset: .zero, blur: rect.width*0.16, color: (color ?? kind.tint).cgColor)
+            badge.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+            context.restoreGState()
+            return
+        }
+        guard let path = path(kind, in: rect) else { return }
         context.saveGState()
         context.setFillColor((color ?? kind.tint).cgColor)
         context.addPath(path); context.drawPath(using: .eoFill)
         context.restoreGState()
     }
     static let icons: [PingKind: NSImage] = Dictionary(uniqueKeysWithValues: PingKind.allCases.compactMap { kind in
-        guard paths[kind] != nil else { return nil }
+        guard paths[kind] != nil || badges[kind] != nil else { return nil }
         return (kind, NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
             draw(kind, in: rect); return true
         })
     })
     static func icon(_ kind: PingKind) -> NSImage? { icons[kind] }
+    static func badge(_ kind: PingKind) -> NSImage? { badges[kind] }
+    /// Emote art needs a little more room than a flat silhouette to stay legible
+    /// in a wheel sector, and it grows by the same highlight step.
+    static func wheelIconSide(_ kind: PingKind, weight: Double) -> CGFloat {
+        CGFloat(badges[kind] != nil ? 30 : 22) + 8*CGFloat(weight)
+    }
     static func sound(_ kind: PingKind) -> URL { root.appendingPathComponent("Sounds/\(kind.soundName).mp3") }
     static var missingFiles: [String] {
         PingKind.allCases.flatMap { kind in
@@ -61,7 +85,7 @@ enum Assets {
             if icon(kind) == nil { missing.append(kind.iconName + ".png") }
             if !FileManager.default.fileExists(atPath: sound(kind).path) { missing.append(kind.soundName + ".mp3") }
             return missing
-        }
+        } + badgeFiles.values.filter { !FileManager.default.fileExists(atPath: root.appendingPathComponent($0).path) }
     }
 }
 
@@ -72,6 +96,7 @@ extension PingKind {
         case .missing, .allIn: return NSColor(srgbRed: 1, green: 0.80, blue: 0.02, alpha: 1)
         case .assist, .push, .needVision: return NSColor(srgbRed: 0, green: 0.89, blue: 0.60, alpha: 1)
         case .onMyWay, .generic: return NSColor(srgbRed: 0.10, green: 0.72, blue: 0.95, alpha: 1)
+        case .weak: return NSColor(srgbRed: 0.78, green: 0.42, blue: 1, alpha: 1)
         }
     }
     var wheelIdleTint: NSColor {

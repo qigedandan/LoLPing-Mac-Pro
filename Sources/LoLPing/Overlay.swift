@@ -32,8 +32,12 @@ private func text(_ string: String, at center: CGPoint, size: CGFloat, color: NS
 final class WheelView: NSView {
     private(set) var selected: PingKind = .generic
     private(set) var direction: CGFloat?
-    private var weights = Array(repeating: 0.0, count: 8)
-    private var origins = Array(repeating: 0.0, count: 8)
+    /// Slot 0 on north, then clockwise. Set before `open()`.
+    var order: [PingKind] = PingKind.defaultWheel {
+        didSet { if order.count != weights.count { weights = order.map { _ in 0.0 }; origins = weights } }
+    }
+    private var weights = PingKind.defaultWheel.map { _ in 0.0 }
+    private var origins = PingKind.defaultWheel.map { _ in 0.0 }
     private var transitionStart: CFTimeInterval = 0
     private var openingStart: CFTimeInterval?
     private var timer: Timer?
@@ -48,7 +52,7 @@ final class WheelView: NSView {
     func setSelection(_ kind: PingKind, angle: CGFloat?, animated: Bool = true) {
         direction = kind == .generic ? nil : angle
         if !animated {
-            selected = kind; weights = PingKind.wheel.map { $0 == kind ? 1 : 0 }
+            selected = kind; weights = order.map { $0 == kind ? 1 : 0 }
             origins = weights; transitionStart = 0; stop(); needsDisplay = true
             return
         }
@@ -79,8 +83,9 @@ final class WheelView: NSView {
     private func updateAnimation(at now: CFTimeInterval) {
         guard transitionStart > 0 else { return }
         let progress = ease((now-transitionStart)/0.12)
-        weights = PingKind.wheel.enumerated().map { index, kind in
-            origins[index] + ((kind == selected ? 1.0 : 0.0)-origins[index])*progress
+        weights = order.enumerated().map { index, kind in
+            guard index < origins.count else { return 0 }
+            return origins[index] + ((kind == selected ? 1.0 : 0.0)-origins[index])*progress
         }
     }
     override func draw(_ dirtyRect: NSRect) {
@@ -90,11 +95,12 @@ final class WheelView: NSView {
         if let start = openingStart { context.setAlpha(CGFloat(ease((CACurrentMediaTime()-start)/0.09))) }
         let s = bounds.width/300, c = CGPoint(x: bounds.midX, y: bounds.midY)
         let outer = WheelGeometry.outerRadius*s, inner = WheelGeometry.centerRadius*s
-        for (index, kind) in PingKind.wheel.enumerated() {
-            let degrees = CGFloat(90-index*45), theta = degrees * .pi/180
+        let stepDegrees = 360/CGFloat(max(order.count, 1)), half = stepDegrees/2
+        for (index, kind) in order.enumerated() {
+            let degrees = CGFloat(90)-CGFloat(index)*stepDegrees, theta = degrees * .pi/180
             let sector = NSBezierPath()
-            sector.appendArc(withCenter: c, radius: outer, startAngle: degrees+22.5, endAngle: degrees-22.5, clockwise: true)
-            sector.appendArc(withCenter: c, radius: inner, startAngle: degrees-22.5, endAngle: degrees+22.5, clockwise: false)
+            sector.appendArc(withCenter: c, radius: outer, startAngle: degrees+half, endAngle: degrees-half, clockwise: true)
+            sector.appendArc(withCenter: c, radius: inner, startAngle: degrees-half, endAngle: degrees+half, clockwise: false)
             sector.close()
             context.saveGState(); sector.addClip()
             NSGradient(colors: [NSColor(white: 0.035, alpha: 0.60), NSColor(white: 0.025, alpha: 0)])?.draw(fromCenter: c, radius: inner, toCenter: c, radius: outer, options: [.drawsBeforeStartingLocation])
@@ -103,13 +109,13 @@ final class WheelView: NSView {
                 NSGradient(colorsAndLocations: (wheelCyan.withAlphaComponent(0.85*weight), 0), (wheelCyan.withAlphaComponent(0.32*weight), 0.6), (wheelCyan.withAlphaComponent(0), 1))?.draw(fromCenter: c, radius: inner, toCenter: c, radius: outer, options: [.drawsBeforeStartingLocation])
             }
             context.restoreGState()
-            let boundary = (degrees+22.5) * .pi/180
+            let boundary = (degrees+half) * .pi/180
             let divider = NSBezierPath()
             divider.move(to: CGPoint(x: c.x+cos(boundary)*inner, y: c.y+sin(boundary)*inner))
             divider.line(to: CGPoint(x: c.x+cos(boundary)*outer, y: c.y+sin(boundary)*outer))
             wheelGold.withAlphaComponent(0.30).setStroke(); divider.lineWidth = 0.55*s; divider.stroke()
             let p = CGPoint(x: c.x+cos(theta)*WheelGeometry.iconRadius*s, y: c.y+sin(theta)*WheelGeometry.iconRadius*s)
-            let side = CGFloat(22+8*weight)*s
+            let side = Assets.wheelIconSide(kind, weight: weight)*s
             let color = mix(kind.wheelIdleTint, kind.tint, weight)
             Assets.draw(kind, in: CGRect(x: p.x-side/2, y: p.y-side/2, width: side, height: side), color: color)
         }
@@ -235,13 +241,14 @@ final class OverlayController {
     private var wheelView: WheelView?
     private var retiring: [(OverlayPanel, DispatchWorkItem)] = []
     private var effects: [(UUID, OverlayPanel, DispatchWorkItem)] = []
-    @discardableResult func showWheel(at anchor: CGPoint, scale: Double) -> CGPoint {
+    @discardableResult func showWheel(at anchor: CGPoint, scale: Double, order: [PingKind] = PingKind.defaultWheel) -> CGPoint {
         hideWheel(animated: false)
         let side = CGFloat(300*scale)
         let screen = NSScreen.screens.first(where: { NSMouseInRect(anchor, $0.frame, false) }) ?? NSScreen.main
         let center = WheelGeometry.clampedCenter(anchor: anchor, frame: screen?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900), radius: side/2)
         let panel = OverlayPanel(frame: CGRect(x: center.x-side/2, y: center.y-side/2, width: side, height: side))
         let view = WheelView(frame: CGRect(x: 0, y: 0, width: side, height: side))
+        view.order = order.isEmpty ? PingKind.defaultWheel : order
         panel.contentView = view; panel.orderFrontRegardless(); view.open()
         wheel = panel; wheelView = view
         return center

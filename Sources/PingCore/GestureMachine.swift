@@ -13,6 +13,8 @@ public final class GestureMachine {
     public private(set) var currentModifiers: Modifiers = []
     public var chord: TriggerChord = .controlOptionCommand
     public var deadZone: CGFloat = WheelGeometry.centerRadius
+    /// The ring the user configured: slot 0 on north, then clockwise.
+    public var wheelOrder: [PingKind] = PingKind.defaultWheel
     private var center: CGPoint = .zero
     private var pointer: CGPoint = .zero
     public init() {}
@@ -56,7 +58,7 @@ public final class GestureMachine {
     public func moved(to point: CGPoint) -> [Action] {
         pointer = point
         guard phase == .open else { return [] }
-        let next = WheelGeometry.selection(at: point, center: center, deadZone: deadZone)
+        let next = WheelGeometry.selection(at: point, center: center, deadZone: deadZone, order: wheelOrder)
         selected = next
         return [.hover(next, angle: WheelGeometry.direction(at: point, center: center, deadZone: deadZone))]
     }

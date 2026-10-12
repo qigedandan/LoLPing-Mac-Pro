@@ -17,6 +17,7 @@ struct ControlView: View {
                 header
                 statusCard
                 settingsCard
+                wheelCard
                 previewCard
                 footer
             }.padding(26)
@@ -133,6 +134,42 @@ struct ControlView: View {
             }
         }.padding(16).card()
     }
+    private var wheelCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("信号轮盘").font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Text("第 1 位在正上方，顺时针排列").font(.system(size: 10)).foregroundStyle(Palette.secondary)
+            }
+            ForEach(Array(model.wheelOrder.enumerated()), id: \.offset) { index, kind in
+                HStack(spacing: 10) {
+                    Text("\(index+1)").font(.system(size: 11, design: .monospaced)).foregroundStyle(Palette.secondary)
+                        .frame(width: 16, alignment: .trailing)
+                    if let icon = Assets.icon(kind) { Image(nsImage: icon).resizable().frame(width: 22, height: 22) }
+                    Picker("位置 \(index+1)", selection: Binding(get: { kind }, set: { model.setWheelSlot(index, to: $0) })) {
+                        ForEach(PingKind.ring) { Text($0.title).tag($0) }
+                    }.labelsHidden().frame(width: 190).accessibilityLabel("第 \(index+1) 个位置的信号")
+                    Spacer(minLength: 0)
+                    Button { model.rotateWheelSlot(index, by: 1) } label: { Image(systemName: "arrow.down") }
+                        .buttonStyle(.borderless).help("与下一个位置交换").accessibilityLabel("第 \(index+1) 位下移")
+                    Button { model.removeWheelSlot(at: index) } label: { Image(systemName: "minus.circle") }
+                        .buttonStyle(.borderless).disabled(model.wheelOrder.count <= AppModel.minWheelSlots)
+                        .help("移除这个位置").accessibilityLabel("移除第 \(index+1) 位")
+                }
+            }
+            HStack(spacing: 10) {
+                Button("添加一个位置") { model.addWheelSlot() }
+                    .buttonStyle(.bordered).controlSize(.small)
+                    .disabled(model.unusedSignals.isEmpty)
+                    .help(model.unusedSignals.isEmpty ? "所有信号都已经在轮盘上" : "把尚未使用的信号加到轮盘上")
+                Button("恢复默认排布") { model.resetWheelOrder() }.buttonStyle(.bordered).controlSize(.small)
+                Spacer()
+                Text(model.unusedSignals.isEmpty ? "全部 \(PingKind.ring.count) 个信号都在轮盘上"
+                                                 : "未使用：" + model.unusedSignals.map(\.title).joined(separator: "、"))
+                    .font(.system(size: 10)).foregroundStyle(Palette.secondary)
+            }
+        }.padding(16).card()
+    }
     private var footer: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -144,7 +181,7 @@ struct ControlView: View {
                 }.menuStyle(.borderlessButton).fixedSize().font(.system(size: 11))
                 Button("退出软件") { NSApp.terminate(nil) }.buttonStyle(.bordered).controlSize(.small)
             }
-            Text("独立桌面工具，非 Riot 官方产品。游戏素材归 Riot Games 所有；社区音效尚未核实为官方原声。")
+            Text("独立桌面工具，非 Riot 官方产品。游戏图标、表情与音效归 Riot Games 所有；音效取自游戏客户端音频。")
                 .font(.system(size: 9)).foregroundStyle(Palette.secondary.opacity(0.7)).fixedSize(horizontal: false, vertical: true)
         }
     }

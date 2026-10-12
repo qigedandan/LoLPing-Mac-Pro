@@ -2,9 +2,13 @@
 
 一个原生 Swift / AppKit 菜单栏软件。在 Mac 上按住组合键，移动鼠标选择英雄联盟风格的信号，松开发送。
 
+共十个信号：游戏原有的八种警报、中央的普通信号，外加本地新增的「弱爆」表情信号。轮盘上的每个方位都能在应用里自定义：第 1 位在正上方，顺时针排列；默认把「弱爆」放在正上方，其余七个方位与游戏保持一致（左侧仍是敌人消失的问号，右侧仍是正在路上）。
+
 ## 下载与安装
 
 **[下载 LoLPing v1.1.0 · Apple Silicon（ZIP）](https://github.com/AllenTHT/LoLPing-Mac/releases/download/v1.1.0/LoLPing-v1.1.0-macOS-arm64.zip)** · [查看最新版本](https://github.com/AllenTHT/LoLPing-Mac/releases/latest)
+
+本地带「弱爆」的构建用 `zsh scripts/build.sh && zsh scripts/make_dmg.sh` 打包成 `dist/LoLPing-v1.2.0-macOS-arm64.dmg`：把 `LoLPing.app` 拖进「应用程序」即可，镜像里另附一份安装说明。
 
 - 适用设备：Apple Silicon（M 系列芯片）Mac；当前安装包不支持 Intel Mac。
 - 系统要求：macOS 13 或更新版本。目前仅在 macOS 15.7.3 实测，其他系统版本和外接屏尚未实测。
@@ -23,6 +27,7 @@
 3. 将鼠标放在要标记的位置，按住 **Control + Option + Command** 约 0.18 秒，移动鼠标选择，松开任意一键发送。无需按住鼠标按钮。
 4. 中央是普通蓝色信号；Esc / 右键取消。信号出现在最初呼出的位置。下一次操作前，请完全松开三个修饰键。
 5. 关闭总开关会立刻取消轮盘、停止动画与声音。关闭窗口仍可从菜单栏打开或暂停；「退出软件」彻底退出。
+6. 「信号轮盘」一节可以改每个方位放哪个信号：下拉框换信号，箭头与下一位交换，减号移除，加号把没用上的信号加回轮盘（九个信号可以任意取舍，最少三个）。改完立刻生效并自动保存；「恢复默认排布」回到出厂布局。
 
 首次运行默认关闭。启用状态、组合键、音量和大小自动保存。软件不会添加登录启动项，不联网同步信号，也不采集键盘输入内容。
 
@@ -35,7 +40,9 @@
 - 官方布局与视觉参照：<https://support.riotgames.com/en-us/league-of-legends/gameplay/smart-ping>
 - 图标依据：CommunityDragon 15.24 的 `assets/ux/menu/` 轮盘图集。它是社区维护的游戏素材镜像，不是 Riot 官方服务。按轮盘图标轮廓重建可缩放矢量路径，修整压缩纹理的边缘噪点；不再放大小地图图片。
 - 轮盘悬浮时图标从 22 点平滑放大到 30 点，并改变颜色与扇区高亮。中心圆半径为 66 点，实际判定区域同步缩放；金色尖角、青色短弧随指针方向旋转，功能名称显示在中心。
-- 音效来源：`alibaztomars/lol-ping-overlay` 的九个音频文件，锁定具体提交；详见 `Resources/asset-sources.json`。与 Riot 原录音完全一致尚未核实，不标称官方原声。
+- 「弱爆」图标：`darrenprx/lolPing` 的 `assets/emotes/unworthy_cn.png`（游戏表情 3239「弱爆（文字版）」的烘焙贴图，含文字气泡），128×128 RGBA，直接按其透明度绘制，不做二次描边。
+- 音效来源：`darrenprx/lolPing` 从游戏 `Common.wad.client` 提取的原始音频（Wwise 事件 `Play_sfx_hud_base_Pings_*`），十个音效一一对应后转码为 mp3；「弱爆」用表情音 `unworthy_cn.ogg`。映射表见 `Resources/asset-sources.json` 的 `soundMapping`。
+- 只借用该项目的素材，界面与功能仍是本项目自己的实现。
 - 游戏素材归 Riot Games 所有。LoLPing 是独立的个人桌面工具，非 Riot 官方产品。
 - 动画使用原生 AppKit / Quartz 绘制，包含独立变化的浮起、辉光、扩散光圈、短暂光点和约两秒淡出。蓝色普通 Ping 对照用户提供的实拍视频调整；其余八种落点动画是同风格重建，未经逐帧原版对照。
 - 图标、文字和光圈按屏幕像素倍率绘制，支持 Retina。效果预览高度随大小调整，最大 150% 时也能容纳完整图标。
@@ -47,13 +54,14 @@
 ```sh
 zsh scripts/build.sh
 zsh scripts/test.sh
+zsh scripts/make_dmg.sh
 dist/LoLPing.app/Contents/MacOS/LoLPing --check-assets
 dist/LoLPing.app/Contents/MacOS/LoLPing --visual-check "$PWD/Verification/Visuals"
 ```
 
-构建脚本生成并本地签名 `dist/LoLPing.app`。首次取得素材或恢复缺失素材时可运行 `python3 scripts/fetch_assets.py`，正常构建与软件运行均无需网络。
+构建脚本生成并本地签名 `dist/LoLPing.app`。首次取得素材或恢复缺失素材时可运行 `python3 scripts/fetch_assets.py`（转码游戏音频需要 `ffmpeg` 在 PATH 上），正常构建与软件运行均无需网络。
 
-`--visual-check` 使用与应用相同的绘制和动画插值，输出九种状态的 75% / 100% / 150% Retina 对照图、1x 图、动画阶段图及无声演示视频。它检查九种效果的动态变化和立即停止行为，不创建全局输入监听、不改偏好设置、不捕获桌面。生成视频需要系统编码器，受限沙箱可能无法调用。
+`--visual-check` 使用与应用相同的绘制和动画插值，输出十种状态的 75% / 100% / 150% Retina 对照图、1x 图、动画阶段图及无声演示视频。它检查十种效果的动态变化和立即停止行为，不创建全局输入监听、不改偏好设置、不捕获桌面。生成视频需要系统编码器，受限沙箱可能无法调用。
 
 轮廓数据随软件离线打包；仅维护素材时才需要 `scripts/trace_wheel_icons.py`（Pillow + NumPy），普通构建与使用不依赖 Python。
 
