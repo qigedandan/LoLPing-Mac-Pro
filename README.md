@@ -8,6 +8,30 @@
 
 默认轮盘就是游戏自己的八种警报，方位与游戏一致（正上方撤退、左侧敌人消失的问号、右侧正在路上）。轮盘上每个方位都能在应用里换成任意信号或表情：第 1 位在正上方，顺时针排列，改完立刻生效并自动保存。设置窗口的「信号轮盘」一节里有一个可上手的圆盘预览——鼠标移上去就能看当前排布指向哪个信号，点一下还能试听音效，不用真的触发全局组合键。
 
+## 效果
+
+主窗口：左边试听 52 个信号与表情，中间是触发键与音量 / 大小，右边常驻信号预览和轮盘预览。
+
+<img src="docs/screenshot-app.jpg" width="760" alt="LoLPing 主窗口">
+
+轮盘九种状态（八种警报 + 中央信号），方位与游戏一致：正上方撤退、左侧敌人消失的问号、右侧正在路上。
+
+<img src="docs/wheel-signals.jpg" width="620" alt="轮盘九种状态">
+
+落点动画的五个阶段（十种效果逐个自检，从浮起、辉光到淡出）：
+
+<img src="docs/effects.jpg" width="520" alt="落点动画阶段">
+
+编辑态：点「自定义轮盘」后，点右侧圆盘的扇区或圆心选方位、点左边格子放入，改完点「结束编辑」。
+
+<img src="docs/screenshot-editing.jpg" width="760" alt="轮盘编辑态">
+
+轮盘大小 75% / 100% / 150% 对照（右侧「尺寸样本」里是 1:1 真实大小）：
+
+<img src="docs/wheel-sizes.jpg" width="760" alt="轮盘大小对照">
+
+无声演示视频见 `Verification/Visuals/LoLPing-effects-demo.mov`（由 `--visual-check` 生成）。
+
 ## 下载与安装
 
 `Releases` 里提供 Apple Silicon（arm64）的 dmg：把 `LoLPing.app` 拖进「应用程序」即可，镜像里另附一份安装说明。
