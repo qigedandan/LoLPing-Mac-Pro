@@ -50,6 +50,17 @@
 - 动画使用原生 AppKit / Quartz 绘制，包含独立变化的浮起、辉光、扩散光圈、短暂光点和约两秒淡出。蓝色普通 Ping 对照用户提供的实拍视频调整；其余八种落点动画是同风格重建，未经逐帧原版对照。
 - 图标、文字和光圈按屏幕像素倍率绘制，支持 Retina。效果预览高度随大小调整，最大 150% 时也能容纳完整图标。
 
+## 参考与致谢
+
+本项目是在两个开源项目的基础上做的：
+
+1. **[AllenTHT/LoLPing-Mac](https://github.com/AllenTHT/LoLPing-Mac)** —— 本项目的代码基础。菜单栏应用、组合键手势状态机、轮盘与落点动画的渲染、控制窗口，以及构建/自检脚本都来自这里；本仓库是它的一个分支版本，界面与功能沿用它的实现。
+2. **[darrenprx/lolPing](https://github.com/darrenprx/lolPing)** —— **只参考素材，不参考界面与功能**。`Resources/Emotes/` 的 44 个表情贴图与 `Resources/Sounds/` 的音效（44 段表情语音 + 八个警报音频）取自它的 `assets/` 目录，其中音频是它用 `tools/extract-assets` 从游戏 `Common.wad.client` 提取的 Wwise 原始音频；该项目以 MIT 许可发布（见 `THIRD-PARTY.md`）。
+
+轮盘的矢量轮廓来自 [CommunityDragon](https://raw.communitydragon.org/)（社区维护的 Riot 资源镜像，非 Riot 官方服务）。
+
+游戏图标、表情贴图与音效均归 Riot Games 所有；本项目是独立的个人桌面工具，非 Riot 官方产品，也不用于任何商业用途。
+
 ## 构建与检查
 
 需要 macOS 13 或更新版本及 Swift 命令行工具。当前交付针对 Apple Silicon；无需额外第三方运行库或完整 Xcode。
