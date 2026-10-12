@@ -9,7 +9,7 @@ APP="$PWD/dist/LoLPing.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/LoLPing "$APP/Contents/MacOS/LoLPing"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-cp -R Resources/Artwork Resources/Icons Resources/Sounds "$APP/Contents/Resources/"
+cp -R Resources/Artwork Resources/Emotes Resources/Icons Resources/Sounds "$APP/Contents/Resources/"
 cp Resources/asset-sources.json "$APP/Contents/Resources/"
 if [[ ! -f "$APP/Contents/Resources/AppIcon.icns" || scripts/make_icon.swift -nt "$APP/Contents/Resources/AppIcon.icns" ]]; then
     swift scripts/make_icon.swift "$PWD/.build/AppIcon.iconset"

@@ -2,15 +2,157 @@ import Foundation
 import CoreGraphics
 
 public enum PingKind: String, CaseIterable, Identifiable {
-    case retreat, push, onMyWay, allIn, assist, needVision, missing, enemyVision, weak, generic
+    /// Riot's eight alerts, then the centre signal.
+    case retreat, push, onMyWay, allIn, assist, needVision, missing, enemyVision, generic
+    /// Emotes — the taunt/expression signals. The raw value is the asset base
+    /// name: art at `Resources/Emotes/<raw>.png`, voice at `Resources/Sounds/<raw>.mp3`.
+    /// Generated from `darrenprx/lolPing`'s emote catalog (see asset-sources.json).
+    case unworthy
+    case unworthyCn = "unworthy_cn"
+    case facepalm
+    case poroSnax = "poro_snax"
+    case sadKitten = "sad_kitten"
+    case cheekyPoro = "cheeky_poro"
+    case angryKitty = "angry_kitty"
+    case ggHeart = "gg_heart"
+    case beeHappy = "bee_happy"
+    case beeMad = "bee_mad"
+    case beeSad = "bee_sad"
+    case snoozyPoro = "snoozy_poro"
+    case wahaha
+    case omgLoveIt = "omg_love_it"
+    case poroRide = "poro_ride"
+    case dontMakeMeLaugh = "dont_make_me_laugh"
+    case woahDizzy = "woah_dizzy"
+    case hahaHilarious = "haha_hilarious"
+    case gasp
+    case superApproved = "super_approved"
+    case pain
+    case laughingOutLoud = "laughing_out_loud"
+    case hatsOff = "hats_off"
+    case callMe = "call_me"
+    case thinkAboutIt = "think_about_it"
+    case unimpressed
+    case didYouJust = "did_you_just"
+    case niceTry = "nice_try"
+    case nice
+    case despair
+    case doesNotCompute = "does_not_compute"
+    case comeAtMe = "come_at_me"
+    case howCouldYou = "how_could_you"
+    case scoutApproved = "scout_approved"
+    case maybeNextTime = "maybe_next_time"
+    case okay
+    case goodJobBuddy = "good_job_buddy"
+    case teamwork
+    case iWillDestroyYou = "i_will_destroy_you"
+    case notToday = "not_today"
+    case oh
+    case comeAgain = "come_again"
+    case magpieOopsie = "magpie_oopsie"
+    case suchFoolishness = "such_foolishness"
     public var id: String { rawValue }
-    /// Signals that can sit on the ring, clockwise from north in the game's own
-    /// order. `generic` stays out: it is the centre, sent by a plain press.
-    public static let ring: [PingKind] = [.retreat, .push, .onMyWay, .allIn, .assist, .needVision, .missing, .enemyVision, .weak]
-    /// Ships with the local 弱爆 signal at the top in place of the retreat alert.
-    /// Eight slots keep the game's exact 45° spacing, so every other alert stays
-    /// where players expect it; the layout is editable in the app.
-    public static let defaultWheel: [PingKind] = [.weak, .push, .onMyWay, .allIn, .assist, .needVision, .missing, .enemyVision]
+    /// Riot's alerts, clockwise from north in the game's own order.
+    public static let alerts: [PingKind] = [.retreat, .push, .onMyWay, .allIn, .assist, .needVision, .missing, .enemyVision]
+    public static let emotes: [PingKind] = [
+        .unworthy,
+        .unworthyCn,
+        .facepalm,
+        .poroSnax,
+        .sadKitten,
+        .cheekyPoro,
+        .angryKitty,
+        .ggHeart,
+        .beeHappy,
+        .beeMad,
+        .beeSad,
+        .snoozyPoro,
+        .wahaha,
+        .omgLoveIt,
+        .poroRide,
+        .dontMakeMeLaugh,
+        .woahDizzy,
+        .hahaHilarious,
+        .gasp,
+        .superApproved,
+        .pain,
+        .laughingOutLoud,
+        .hatsOff,
+        .callMe,
+        .thinkAboutIt,
+        .unimpressed,
+        .didYouJust,
+        .niceTry,
+        .nice,
+        .despair,
+        .doesNotCompute,
+        .comeAtMe,
+        .howCouldYou,
+        .scoutApproved,
+        .maybeNextTime,
+        .okay,
+        .goodJobBuddy,
+        .teamwork,
+        .iWillDestroyYou,
+        .notToday,
+        .oh,
+        .comeAgain,
+        .magpieOopsie,
+        .suchFoolishness,
+    ]
+    /// Everything that can be placed on the ring, alerts first. `generic` stays
+    /// out: it is the centre, sent by a plain press.
+    public static let ring: [PingKind] = alerts + emotes
+    /// Ships with the game's own wheel; any slot can be swapped for an emote in
+    /// the settings window.
+    public static let defaultWheel: [PingKind] = alerts
+    public var isEmote: Bool { PingKind.emotes.contains(self) }
+    static let emoteTitles: [PingKind: String] = [
+        .unworthy: "弱爆",
+        .unworthyCn: "弱爆（文字版）",
+        .facepalm: "捂脸",
+        .poroSnax: "魄罗佳肴",
+        .sadKitten: "悲伤猫咪",
+        .cheekyPoro: "调皮魄罗",
+        .angryKitty: "我生气了！",
+        .ggHeart: "精彩的对局 <3",
+        .beeHappy: "小蜜蜂 高兴",
+        .beeMad: "小蜜蜂 疯狂",
+        .beeSad: "小蜜蜂 悲伤",
+        .snoozyPoro: "打盹魄罗",
+        .wahaha: "笑哭我了",
+        .omgLoveIt: "我的天，爱死它了",
+        .poroRide: "溜了溜了",
+        .dontMakeMeLaugh: "xswl",
+        .woahDizzy: "晕晕",
+        .hahaHilarious: "哈哈笑死",
+        .gasp: "倒吸一口凉气！",
+        .superApproved: "超赞的",
+        .pain: "强颜欢笑",
+        .laughingOutLoud: "哈哈哈",
+        .hatsOff: "脱帽致意",
+        .callMe: "双击666！",
+        .thinkAboutIt: "脑子是个好东西",
+        .unimpressed: "凡人！动态表情",
+        .didYouJust: "动态 我太难了！",
+        .niceTry: "棒棒哒",
+        .nice: "干得漂亮",
+        .despair: "呜呜呜---",
+        .doesNotCompute: "无法求解",
+        .comeAtMe: "放马过来",
+        .howCouldYou: "你怎能这样",
+        .scoutApproved: "提莫说很好",
+        .maybeNextTime: "也许下次",
+        .okay: "OK",
+        .goodJobBuddy: "干得好，伙计！",
+        .teamwork: "团队协作！",
+        .iWillDestroyYou: "你瞅啥？",
+        .notToday: "没门！",
+        .oh: "大受震撼",
+        .comeAgain: "一脸问号",
+        .magpieOopsie: "雀实有问题",
+        .suchFoolishness: "如此愚蠢",
+    ]
     /// Position on a given ring order, clockwise from north; nil when absent.
     public func index(in order: [PingKind]) -> Int? { order.firstIndex(of: self) }
     /// Decodes a persisted ring layout, dropping unknown names and the centre-only
@@ -30,8 +172,8 @@ public enum PingKind: String, CaseIterable, Identifiable {
         case .needVision: return "需要视野"
         case .missing: return "敌人消失"
         case .enemyVision: return "敌方视野"
-        case .weak: return "弱爆"
         case .generic: return "普通信号"
+        default: return PingKind.emoteTitles[self] ?? rawValue
         }
     }
     public var iconName: String {
@@ -44,8 +186,9 @@ public enum PingKind: String, CaseIterable, Identifiable {
         case .needVision: return "need_ward"
         case .missing: return "mia_new"
         case .enemyVision: return "area_is_warded_small_red_new"
-        case .weak: return "weak"
         case .generic: return "ping"
+        /// An emote's asset base name.
+        default: return rawValue
         }
     }
     public var soundName: String {
@@ -58,8 +201,9 @@ public enum PingKind: String, CaseIterable, Identifiable {
         case .needVision: return "need_vision"
         case .missing: return "q_mark"
         case .enemyVision: return "enemy_vision"
-        case .weak: return "weak"
         case .generic: return "alert"
+        /// An emote's asset base name.
+        default: return rawValue
         }
     }
 }

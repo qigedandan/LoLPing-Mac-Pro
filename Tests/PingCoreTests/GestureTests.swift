@@ -18,6 +18,13 @@ private func XCTAssertNil<T>(_ actual: T?, file: StaticString = #filePath, line:
         print("FAIL \(file):\(line): expected nil, got \(actual)")
     }
 }
+private func XCTAssertTrue(_ actual: Bool, file: StaticString = #filePath, line: UInt = #line) {
+    assertions += 1
+    if !actual {
+        failures += 1
+        print("FAIL \(file):\(line): expected true")
+    }
+}
 
 final class GestureTests {
     let chord: Modifiers = [.control, .option, .command]
@@ -28,23 +35,26 @@ final class GestureTests {
         XCTAssertEqual(machine.delayElapsed(), [.show(anchor)])
     }
     func testSectorSelectionAndCentralDeadZone() {
-        // The shipped ring: 弱爆 on north, then the game's alerts clockwise, so an
-        // eight-slot ring keeps the game's own 45° spacing.
+        // The shipped ring is the game's own wheel again: eight alerts, 45° apart.
+        XCTAssertEqual(PingKind.defaultWheel, PingKind.alerts)
         XCTAssertEqual(PingKind.defaultWheel,
-                       [.weak, .push, .onMyWay, .allIn, .assist, .needVision, .missing, .enemyVision])
+                       [.retreat, .push, .onMyWay, .allIn, .assist, .needVision, .missing, .enemyVision])
+        XCTAssertEqual(PingKind.ring, PingKind.alerts + PingKind.emotes)
+        XCTAssertTrue(PingKind.emotes.contains(.unworthyCn))
         let directions: [CGPoint] = [.init(x: 0,y: 100), .init(x: 100,y: 100), .init(x: 100,y: 0), .init(x: 100,y: -100),
                                      .init(x: 0,y: -100), .init(x: -100,y: -100), .init(x: -100,y: 0), .init(x: -100,y: 100)]
         for (index, vector) in directions.enumerated() {
             XCTAssertEqual(WheelGeometry.selection(at: vector, center: .zero, deadZone: WheelGeometry.centerRadius), PingKind.defaultWheel[index])
         }
         // A custom ring keeps its own order and slot count, whatever the user picks.
-        let custom: [PingKind] = [.weak, .retreat, .push, .onMyWay, .allIn, .assist, .needVision, .missing, .enemyVision]
+        // A ring that mixes alerts and emotes, as the settings window allows.
+        let custom: [PingKind] = [.unworthyCn, .retreat, .push, .facepalm, .allIn, .assist, .needVision, .missing, .enemyVision]
         for (index, kind) in custom.enumerated() {
             let angle = WheelGeometry.angle(forIndex: index, count: custom.count) + WheelGeometry.step(custom.count)*0.49
             let vector = CGPoint(x: sin(angle)*100, y: cos(angle)*100)
             XCTAssertEqual(WheelGeometry.selection(at: vector, center: .zero, deadZone: WheelGeometry.centerRadius, order: custom), kind)
         }
-        let tiny: [PingKind] = [.weak, .missing, .assist]
+        let tiny: [PingKind] = [.unworthy, .missing, .assist]
         for (index, kind) in tiny.enumerated() {
             let angle = WheelGeometry.angle(forIndex: index, count: tiny.count)
             let vector = CGPoint(x: sin(angle)*100, y: cos(angle)*100)
@@ -56,7 +66,7 @@ final class GestureTests {
     }
     func testConfiguredRingDrivesHoverAndCommit() {
         let machine = GestureMachine()
-        machine.wheelOrder = [.weak, .retreat, .push, .onMyWay, .allIn, .assist, .needVision, .missing, .enemyVision]
+        machine.wheelOrder = [.unworthyCn, .retreat, .push, .onMyWay, .allIn, .assist, .needVision, .missing, .enemyVision]
         open(machine)
         XCTAssertEqual(machine.moved(to: CGPoint(x: 700, y: 400)), [.hover(.push, angle: .pi/2)])
         XCTAssertEqual(machine.flagsChanged([], at: anchor, otherInputHeld: false), [.dismiss, .commit(.push, anchor)])
@@ -66,10 +76,10 @@ final class GestureTests {
         XCTAssertEqual(PingKind.decodeWheelOrder(PingKind.defaultWheel.map(\.rawValue)), PingKind.defaultWheel)
         XCTAssertEqual(PingKind.decodeWheelOrder(PingKind.ring.map(\.rawValue)), PingKind.ring)
         // Unknown names and the centre-only signal are dropped, gaps close up.
-        XCTAssertEqual(PingKind.decodeWheelOrder(["weak", "generic", "missing", "assist"]), [.weak, .missing, .assist])
+        XCTAssertEqual(PingKind.decodeWheelOrder(["unworthy_cn", "generic", "missing", "assist"]), [.unworthyCn, .missing, .assist])
         // Too little left to be a ring, so the caller falls back to the default.
-        XCTAssertNil(PingKind.decodeWheelOrder(["weak", "generic"]))
-        XCTAssertNil(PingKind.decodeWheelOrder(["nonsense", "weak", "missing"]))
+        XCTAssertNil(PingKind.decodeWheelOrder(["unworthy_cn", "generic"]))
+        XCTAssertNil(PingKind.decodeWheelOrder(["nonsense", "unworthy_cn", "missing"]))
         XCTAssertNil(PingKind.decodeWheelOrder([]))
     }
     func testShortPressNeverPingsAndLateTimerDoesNothing() {
@@ -168,9 +178,9 @@ final class GestureTests {
     func testContinuousDirectionAndCenterReset() {
         let machine = GestureMachine(); open(machine)
         let first = CGPoint(x: 600, y: 500), second = CGPoint(x: 610, y: 500)
-        XCTAssertEqual(machine.moved(to: first), [.hover(.weak, angle: 0)])
-        XCTAssertEqual(machine.moved(to: second), [.hover(.weak, angle: atan2(10, 100))])
-        XCTAssertEqual(machine.selected, .weak)
+        XCTAssertEqual(machine.moved(to: first), [.hover(.retreat, angle: 0)])
+        XCTAssertEqual(machine.moved(to: second), [.hover(.retreat, angle: atan2(10, 100))])
+        XCTAssertEqual(machine.selected, .retreat)
         XCTAssertEqual(machine.moved(to: CGPoint(x: 600, y: 466)), [.hover(.generic, angle: nil)])
         XCTAssertEqual(machine.flagsChanged([], at: anchor, otherInputHeld: false), [.dismiss, .commit(.generic, anchor)])
         XCTAssertEqual(machine.moved(to: first), [])

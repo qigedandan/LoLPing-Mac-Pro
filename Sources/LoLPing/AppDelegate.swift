@@ -16,8 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window = NSWindow(contentViewController: controller)
         window.title = "LoLPing · 桌面信号"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 680, height: 800))
-        window.minSize = NSSize(width: 640, height: 680)
+        window.setContentSize(NSSize(width: 780, height: 880))
+        window.minSize = NSSize(width: 700, height: 700)
         window.isReleasedWhenClosed = false
         window.backgroundColor = NSColor(srgbRed: 0.035, green: 0.055, blue: 0.08, alpha: 1)
         window.titlebarAppearsTransparent = true

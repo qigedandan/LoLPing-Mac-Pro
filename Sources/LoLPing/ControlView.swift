@@ -11,6 +11,7 @@ private enum Palette {
 
 struct ControlView: View {
     @ObservedObject var model: AppModel
+    @State private var pointed: PingKind = .generic
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -19,13 +20,14 @@ struct ControlView: View {
                 settingsCard
                 wheelCard
                 previewCard
+                emoteCard
                 footer
             }.padding(26)
         }
         .background(Palette.background)
         .preferredColorScheme(.dark)
         .tint(Palette.gold)
-        .frame(minWidth: 610, minHeight: 620)
+        .frame(minWidth: 700, minHeight: 640)
     }
     private var header: some View {
         HStack(spacing: 14) {
@@ -98,7 +100,7 @@ struct ControlView: View {
     private var previewCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("信号试用").font(.system(size: 14, weight: .semibold))
+                Text("游戏信号试用").font(.system(size: 14, weight: .semibold))
                 Spacer()
                 Text("仅在此区域预览 · 无需授权").font(.system(size: 10)).foregroundStyle(Palette.secondary)
             }
@@ -119,7 +121,7 @@ struct ControlView: View {
                     .font(.system(size: 10)).foregroundStyle(Palette.secondary).padding(10) } }
             }.frame(height: max(120, 120*model.scale)).clipped()
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                ForEach(PingKind.allCases) { kind in
+                ForEach(PingKind.alerts + [PingKind.generic]) { kind in
                     Button { model.preview(kind) } label: {
                         HStack(spacing: 9) {
                             if let icon = Assets.icon(kind) { Image(nsImage: icon).resizable().frame(width: 25, height: 25) }
@@ -141,20 +143,36 @@ struct ControlView: View {
                 Spacer()
                 Text("第 1 位在正上方，顺时针排列").font(.system(size: 10)).foregroundStyle(Palette.secondary)
             }
-            ForEach(Array(model.wheelOrder.enumerated()), id: \.offset) { index, kind in
-                HStack(spacing: 10) {
-                    Text("\(index+1)").font(.system(size: 11, design: .monospaced)).foregroundStyle(Palette.secondary)
-                        .frame(width: 16, alignment: .trailing)
-                    if let icon = Assets.icon(kind) { Image(nsImage: icon).resizable().frame(width: 22, height: 22) }
-                    Picker("位置 \(index+1)", selection: Binding(get: { kind }, set: { model.setWheelSlot(index, to: $0) })) {
-                        ForEach(PingKind.ring) { Text($0.title).tag($0) }
-                    }.labelsHidden().frame(width: 190).accessibilityLabel("第 \(index+1) 个位置的信号")
-                    Spacer(minLength: 0)
-                    Button { model.rotateWheelSlot(index, by: 1) } label: { Image(systemName: "arrow.down") }
-                        .buttonStyle(.borderless).help("与下一个位置交换").accessibilityLabel("第 \(index+1) 位下移")
-                    Button { model.removeWheelSlot(at: index) } label: { Image(systemName: "minus.circle") }
-                        .buttonStyle(.borderless).disabled(model.wheelOrder.count <= AppModel.minWheelSlots)
-                        .help("移除这个位置").accessibilityLabel("移除第 \(index+1) 位")
+            HStack(alignment: .top, spacing: 16) {
+                VStack(spacing: 6) {
+                    WheelPreview(order: model.wheelOrder) { kind in
+                        model.preview(kind)
+                    } onHover: { kind in
+                        pointed = kind
+                    }
+                    .frame(width: 240, height: 240)
+                    Text(pointed.isEmote || pointed == .generic ? pointed.title : "游戏信号 · " + pointed.title)
+                        .font(.system(size: 11)).foregroundStyle(Color(nsColor: pointed.tint))
+                    Text("把鼠标移到圆盘上试位置，点一下试听该信号").font(.system(size: 9)).foregroundStyle(Palette.secondary)
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(model.wheelOrder.enumerated()), id: \.offset) { index, kind in
+                        HStack(spacing: 8) {
+                            Text("\(index+1)").font(.system(size: 11, design: .monospaced)).foregroundStyle(Palette.secondary)
+                                .frame(width: 14, alignment: .trailing)
+                            if let icon = Assets.icon(kind) { Image(nsImage: icon).resizable().frame(width: 20, height: 20) }
+                            Picker("位置 \(index+1)", selection: Binding(get: { kind }, set: { model.setWheelSlot(index, to: $0) })) {
+                                Section("游戏信号") { ForEach(PingKind.alerts) { Text($0.title).tag($0) } }
+                                Section("表情") { ForEach(PingKind.emotes) { Text($0.title).tag($0) } }
+                            }.labelsHidden().frame(width: 210).accessibilityLabel("第 \(index+1) 个位置的信号")
+                            Spacer(minLength: 0)
+                            Button { model.rotateWheelSlot(index, by: 1) } label: { Image(systemName: "arrow.down") }
+                                .buttonStyle(.borderless).help("与下一个位置交换").accessibilityLabel("第 \(index+1) 位下移")
+                            Button { model.removeWheelSlot(at: index) } label: { Image(systemName: "minus.circle") }
+                                .buttonStyle(.borderless).disabled(model.wheelOrder.count <= AppModel.minWheelSlots)
+                                .help("移除这个位置").accessibilityLabel("移除第 \(index+1) 位")
+                        }
+                    }
                 }
             }
             HStack(spacing: 10) {
@@ -167,6 +185,29 @@ struct ControlView: View {
                 Text(model.unusedSignals.isEmpty ? "全部 \(PingKind.ring.count) 个信号都在轮盘上"
                                                  : "未使用：" + model.unusedSignals.map(\.title).joined(separator: "、"))
                     .font(.system(size: 10)).foregroundStyle(Palette.secondary)
+            }
+        }.padding(16).card()
+    }
+    private var emoteCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("表情").font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Text("点一下试听音效 · 在「信号轮盘」里放进方位").font(.system(size: 10)).foregroundStyle(Palette.secondary)
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                ForEach(PingKind.emotes) { kind in
+                    Button { model.preview(kind) } label: {
+                        HStack(spacing: 8) {
+                            if let icon = Assets.icon(kind) { Image(nsImage: icon).resizable().frame(width: 24, height: 24) }
+                            Text(kind.title).font(.system(size: 11, weight: .medium)).lineLimit(1)
+                            Spacer(minLength: 0)
+                        }.padding(.horizontal, 10).frame(height: 42)
+                        .background(model.previewKind == kind && model.previewVisible ? Color(nsColor: kind.tint).opacity(0.14) : Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                        .contentShape(Rectangle())
+                    }.buttonStyle(.plain).accessibilityLabel("预览\(kind.title)")
+                }
             }
         }.padding(16).card()
     }
@@ -204,6 +245,31 @@ private struct PreviewGrid: Shape {
             path.move(to: CGPoint(x: 0, y: y)); path.addLine(to: CGPoint(x: rect.width, y: y))
         }
         return path
+    }
+}
+
+/// The settings-window ring: the same renderer and the same selection maths as the
+/// desktop overlay, driven by the mouse instead of the trigger chord.
+private struct WheelPreview: NSViewRepresentable {
+    let order: [PingKind]
+    let onPick: (PingKind) -> Void
+    let onHover: (PingKind) -> Void
+    func makeNSView(context: Context) -> WheelView {
+        let view = WheelView(frame: NSRect(x: 0, y: 0, width: 240, height: 240))
+        view.isInteractive = true
+        view.order = order
+        view.onPick = onPick
+        view.onHover = onHover
+        view.setSelection(.generic, angle: nil, animated: false)
+        return view
+    }
+    func updateNSView(_ view: WheelView, context: Context) {
+        view.order = order
+        view.onPick = onPick
+        view.onHover = onHover
+        // A changed layout invalidates whatever the pointer was pointing at.
+        view.setSelection(.generic, angle: nil, animated: false)
+        view.needsDisplay = true
     }
 }
 

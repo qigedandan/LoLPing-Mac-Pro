@@ -10,9 +10,11 @@ enum Assets {
             .deletingLastPathComponent().appendingPathComponent("Resources")
     }()
     private struct Vector: Decodable { let contours: [[[CGFloat]]] }
-    /// Signals drawn as emote art instead of a traced silhouette. The image is a
-    /// 128x128 baked RGBA emote from `darrenprx/lolPing` (see asset-sources.json).
-    private static let badgeFiles: [PingKind: String] = [.weak: "Artwork/weak-emote.png"]
+    /// Emote signals are drawn as art instead of a traced silhouette: 128x128
+    /// baked RGBA files from `darrenprx/lolPing` (see asset-sources.json).
+    private static let badgeFiles: [PingKind: String] = Dictionary(uniqueKeysWithValues: PingKind.emotes.map {
+        ($0, "Emotes/\($0.rawValue).png")
+    })
     static let badges: [PingKind: NSImage] = Dictionary(uniqueKeysWithValues: badgeFiles.compactMap { kind, path in
         guard let image = NSImage(contentsOf: root.appendingPathComponent(path)) else { return nil }
         image.isTemplate = false
@@ -80,12 +82,16 @@ enum Assets {
     }
     static func sound(_ kind: PingKind) -> URL { root.appendingPathComponent("Sounds/\(kind.soundName).mp3") }
     static var missingFiles: [String] {
-        PingKind.allCases.flatMap { kind in
+        PingKind.allCases.flatMap { kind -> [String] in
             var missing: [String] = []
-            if icon(kind) == nil { missing.append(kind.iconName + ".png") }
-            if !FileManager.default.fileExists(atPath: sound(kind).path) { missing.append(kind.soundName + ".mp3") }
+            if let badge = badgeFiles[kind] {
+                if !FileManager.default.fileExists(atPath: root.appendingPathComponent(badge).path) { missing.append(badge) }
+            } else if icon(kind) == nil {
+                missing.append("Icons/\(kind.iconName).png")
+            }
+            if !FileManager.default.fileExists(atPath: sound(kind).path) { missing.append("Sounds/\(kind.soundName).mp3") }
             return missing
-        } + badgeFiles.values.filter { !FileManager.default.fileExists(atPath: root.appendingPathComponent($0).path) }
+        }
     }
 }
 
@@ -96,8 +102,20 @@ extension PingKind {
         case .missing, .allIn: return NSColor(srgbRed: 1, green: 0.80, blue: 0.02, alpha: 1)
         case .assist, .push, .needVision: return NSColor(srgbRed: 0, green: 0.89, blue: 0.60, alpha: 1)
         case .onMyWay, .generic: return NSColor(srgbRed: 0.10, green: 0.72, blue: 0.95, alpha: 1)
-        case .weak: return NSColor(srgbRed: 0.78, green: 0.42, blue: 1, alpha: 1)
+        default: return PingKind.emoteTint(self)
         }
+    }
+    /// Emotes take a colour from a fixed palette picked by a stable hash, so a
+    /// given emote always glows the same colour.
+    static func emoteTint(_ kind: PingKind) -> NSColor {
+        let palette: [(CGFloat, CGFloat, CGFloat)] = [
+            (0.78, 0.42, 1.00), (1.00, 0.45, 0.72), (0.42, 0.72, 1.00), (0.35, 0.90, 0.78),
+            (1.00, 0.62, 0.28), (0.88, 0.82, 0.32), (0.66, 0.92, 0.40), (0.60, 0.60, 1.00),
+        ]
+        var hash = 5381
+        for byte in kind.rawValue.utf8 { hash = (hash &* 33) &+ Int(byte) }
+        let (r, g, b) = palette[((hash % palette.count) + palette.count) % palette.count]
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: 1)
     }
     var wheelIdleTint: NSColor {
         switch self {

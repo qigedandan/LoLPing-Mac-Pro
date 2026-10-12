@@ -41,12 +41,54 @@ final class WheelView: NSView {
     private var transitionStart: CFTimeInterval = 0
     private var openingStart: CFTimeInterval?
     private var timer: Timer?
+    /// Settings-window previews drive the wheel from the mouse; the desktop
+    /// overlay keeps it passive so it never competes with the real cursor.
+    var isInteractive = false {
+        didSet {
+            guard isInteractive != oldValue else { return }
+            if isInteractive { addTrackingArea(tracking) } else { removeTrackingArea(tracking) }
+        }
+    }
+    var onHover: ((PingKind) -> Void)?
+    var onPick: ((PingKind) -> Void)?
+    private lazy var tracking = NSTrackingArea(rect: .zero,
+                                               options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+                                               owner: self, userInfo: nil)
 
     override init(frame: NSRect) { super.init(frame: frame); wantsLayer = true }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     deinit { timer?.invalidate() }
     override var isOpaque: Bool { false }
     override func viewDidChangeBackingProperties() { super.viewDidChangeBackingProperties(); needsDisplay = true }
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        guard isInteractive else { return }
+        removeTrackingArea(tracking); addTrackingArea(tracking)
+    }
+    override func mouseMoved(with event: NSEvent) {
+        guard isInteractive else { return }
+        hover(at: convert(event.locationInWindow, from: nil))
+    }
+    override func mouseExited(with event: NSEvent) {
+        guard isInteractive else { return }
+        setSelection(.generic, angle: nil)
+        onHover?(.generic)
+    }
+    override func mouseDown(with event: NSEvent) {
+        guard isInteractive else { return }
+        hover(at: convert(event.locationInWindow, from: nil))
+        onPick?(selected)
+    }
+    /// The preview shares the live selection maths, so what you point at in the
+    /// settings window is exactly what the real gesture would send.
+    private func hover(at point: CGPoint) {
+        let scale = bounds.width/300
+        let centre = CGPoint(x: bounds.midX, y: bounds.midY)
+        let deadZone = WheelGeometry.centerRadius*scale
+        let kind = WheelGeometry.selection(at: point, center: centre, deadZone: deadZone, order: order)
+        setSelection(kind, angle: WheelGeometry.direction(at: point, center: centre, deadZone: deadZone))
+        onHover?(kind)
+    }
 
     func open() { openingStart = CACurrentMediaTime(); startTimer() }
     func setSelection(_ kind: PingKind, angle: CGFloat?, animated: Bool = true) {

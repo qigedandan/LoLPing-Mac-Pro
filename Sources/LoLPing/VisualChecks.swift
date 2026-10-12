@@ -5,6 +5,12 @@ import PingCore
 /// Captures this app's own renderer, not the desktop. Does not request screen
 /// recording permission, create input taps, or alter the user's preferences.
 enum VisualChecks {
+    /// The eight alerts, the centre signal and one emote: the atlas silhouettes and
+    /// the emote-art path both get covered without rendering all 40+ emotes.
+    static let kinds: [PingKind] = PingKind.alerts + [.unworthyCn, .generic]
+    /// What the sheets and the demo video render as a ring: the shipped alerts plus
+    /// the emote signal, so the emote art is checked inside a real ring too.
+    static let ringSample: [PingKind] = PingKind.alerts + [.unworthyCn]
     static func bitmap(size: CGSize, pixelScale: CGFloat = 2, draw: () -> Void) -> NSBitmapImageRep {
         let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width*pixelScale), pixelsHigh: Int(size.height*pixelScale), bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
         rep.size = size
@@ -36,15 +42,16 @@ enum VisualChecks {
         _ = NSApplication.shared
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try checkEffectLifecycle()
-        let columns = 3, rows = (PingKind.allCases.count+columns-1)/columns
+        let columns = 3, rows = (kinds.count+columns-1)/columns
         for scale in [0.75, 1.0, 1.5] {
             let side = CGFloat(300*scale), spacing = CGFloat(16)
             let rep = bitmap(size: CGSize(width: side*CGFloat(columns)+spacing*CGFloat(columns+1),
                                          height: side*CGFloat(rows)+spacing*CGFloat(rows+1))) {
-                for (index, kind) in PingKind.allCases.enumerated() {
+                for (index, kind) in kinds.enumerated() {
                     let view = WheelView(frame: CGRect(x: 0, y: 0, width: side, height: side))
-                    let angle: CGFloat? = kind.index(in: PingKind.defaultWheel)
-                        .map { WheelGeometry.angle(forIndex: $0, count: PingKind.defaultWheel.count) }
+                    view.order = ringSample
+                    let angle: CGFloat? = kind.index(in: ringSample)
+                        .map { WheelGeometry.angle(forIndex: $0, count: ringSample.count) }
                     view.setSelection(kind, angle: angle, animated: false)
                     draw(view, at: CGPoint(x: spacing+CGFloat(index%columns)*(side+spacing),
                                            y: spacing+CGFloat(rows-1-index/columns)*(side+spacing)))
@@ -57,12 +64,12 @@ enum VisualChecks {
         view.setSelection(.missing, angle: -.pi/2, animated: false)
         try save(bitmap(size: CGSize(width: 300, height: 300), pixelScale: 1) { draw(view, at: .zero) }, to: directory.appendingPathComponent("wheel-100-1x.png"))
         let times = [0.08, 0.25, 0.65, 1.3, 1.85]
-        let phases = bitmap(size: CGSize(width: 180*CGFloat(times.count), height: 180*CGFloat(PingKind.allCases.count))) {
-            for (row, kind) in PingKind.allCases.enumerated() {
+        let phases = bitmap(size: CGSize(width: 180*CGFloat(times.count), height: 180*CGFloat(kinds.count))) {
+            for (row, kind) in kinds.enumerated() {
                 for (column, time) in times.enumerated() {
                     let effect = PingEffectView(frame: CGRect(x: 0, y: 0, width: 180, height: 180), kind: kind, scale: 1)
                     effect.seek(to: time)
-                    draw(effect, at: CGPoint(x: CGFloat(column)*180, y: CGFloat(PingKind.allCases.count-1-row)*180))
+                    draw(effect, at: CGPoint(x: CGFloat(column)*180, y: CGFloat(kinds.count-1-row)*180))
                 }
             }
         }
@@ -76,7 +83,7 @@ enum VisualChecks {
             Data(bytes: rep.bitmapData!, count: rep.bytesPerRow*rep.pixelsHigh)
         }
         let backdrop = pixels(bitmap(size: size) {})
-        for kind in PingKind.allCases {
+        for kind in kinds {
             let effect = PingEffectView(frame: CGRect(origin: .zero, size: size), kind: kind, scale: 1)
             effect.seek(to: 0.25)
             let early = pixels(bitmap(size: size) { draw(effect, at: .zero) })
@@ -88,13 +95,13 @@ enum VisualChecks {
                 throw NSError(domain: "VisualChecks", code: 4, userInfo: [NSLocalizedDescriptionKey: "Animation/stop check failed: \(kind.title)"])
             }
         }
-        print("PASS \(PingKind.allCases.count) effects: visible animation changes and immediate stop (\(PingKind.allCases.count*3) pixel comparisons).")
+        print("PASS \(kinds.count) effects: visible animation changes and immediate stop (\(kinds.count*3) pixel comparisons).")
     }
     private static func movie(to url: URL) throws {
         if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
         let size = CGSize(width: 960, height: 720), fps = 30, frames = 330
         // The wheel phase gives every sector 0.65s; the effects phase follows it.
-        let wheelPhase = 0.6 + 0.65*Double(PingKind.defaultWheel.count)
+        let wheelPhase = 0.6 + 0.65*Double(ringSample.count)
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: Int(size.width), AVVideoHeightKey: Int(size.height)])
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB, kCVPixelBufferWidthKey as String: Int(size.width), kCVPixelBufferHeightKey as String: Int(size.height), kCVPixelBufferCGImageCompatibilityKey as String: true, kCVPixelBufferCGBitmapContextCompatibilityKey as String: true])
@@ -102,16 +109,17 @@ enum VisualChecks {
         guard writer.startWriting() else { throw writer.error! }
         writer.startSession(atSourceTime: .zero)
         let wheel = WheelView(frame: CGRect(x: 0, y: 0, width: 450, height: 450))
+        wheel.order = ringSample
         var previous = -1
         for frame in 0..<frames {
             let t = Double(frame)/Double(fps)
             let rep = bitmap(size: size, pixelScale: 1) {
                 if t < wheelPhase {
                     let segment = max(-1, Int((t-0.6)/0.65))
-                    let inWheel = segment >= 0 && segment < PingKind.defaultWheel.count
-                    let kind: PingKind = inWheel ? PingKind.defaultWheel[segment] : .generic
+                    let inWheel = segment >= 0 && segment < ringSample.count
+                    let kind: PingKind = inWheel ? ringSample[segment] : .generic
                     let angle: CGFloat? = inWheel
-                        ? WheelGeometry.angle(forIndex: segment, count: PingKind.defaultWheel.count) + CGFloat(sin(t*7))*0.15 : nil
+                        ? WheelGeometry.angle(forIndex: segment, count: ringSample.count) + CGFloat(sin(t*7))*0.15 : nil
                     if segment != previous { wheel.setSelection(wheel.selected, angle: wheel.direction, animated: false); previous = segment }
                     wheel.setSelection(kind, angle: angle)
                     wheel.sampleTransition(elapsed: t < 0.6 ? 1 : (t-0.6).truncatingRemainder(dividingBy: 0.65))
@@ -119,13 +127,13 @@ enum VisualChecks {
                     caption("轮盘：放大 · 方向指示 · 中央说明", center: CGPoint(x: 480, y: 70))
                 } else {
                     let age = (t-wheelPhase).truncatingRemainder(dividingBy: 2)
-                    let columns = 4, rows = (PingKind.allCases.count+columns-1)/columns
-                    for (index, kind) in PingKind.allCases.enumerated() {
+                    let columns = 4, rows = (kinds.count+columns-1)/columns
+                    for (index, kind) in kinds.enumerated() {
                         let effect = PingEffectView(frame: CGRect(x: 0, y: 0, width: 240, height: 200), kind: kind, scale: 1.2)
                         effect.seek(to: age)
                         draw(effect, at: CGPoint(x: 120+CGFloat(index%columns)*240, y: 65+CGFloat(rows-1-index/columns)*205))
                     }
-                    caption("\(PingKind.allCases.count) 种信号：浮起 · 光圈扩散 · 淡出", center: CGPoint(x: 480, y: 35))
+                    caption("\(kinds.count) 种信号：浮起 · 光圈扩散 · 淡出", center: CGPoint(x: 480, y: 35))
                 }
             }
             while !input.isReadyForMoreMediaData { RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.005)) }
