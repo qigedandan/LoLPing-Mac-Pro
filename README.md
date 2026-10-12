@@ -64,6 +64,12 @@
 
 游戏图标、表情贴图与音效均归 Riot Games 所有；本项目是独立的个人桌面工具，非 Riot 官方产品，也不用于任何商业用途。
 
+## 许可
+
+- 本仓库自己写的部分（`Sources/`、`scripts/`、`Tests/`、文档）按 **MIT 许可**发布，全文见 `LICENSE`。你可以自由使用、修改、再分发，包括商用。
+- 上游 [AllenTHT/LoLPing-Mac](https://github.com/AllenTHT/LoLPing-Mac) 未声明许可证。本仓库是它的分支版本，保留其提交历史与署名；**属于上游的那部分代码不因本仓库的 MIT 许可而被再授权**。要把它用于 MIT 之外的用途，建议先联系上游作者。
+- 游戏图标、表情贴图与音效归 **Riot Games** 所有，仅用于个人、非商业用途。表情贴图与音频素材取自 MIT 许可的 [darrenprx/lolPing](https://github.com/darrenprx/lolPing)，其许可全文与逐项出处见 `THIRD-PARTY.md`。
+
 ## 构建与检查
 
 需要 macOS 13 或更新版本及 Swift 命令行工具。当前交付针对 Apple Silicon；无需额外第三方运行库或完整 Xcode。
