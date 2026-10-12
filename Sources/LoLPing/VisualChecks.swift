@@ -100,15 +100,20 @@ enum VisualChecks {
             }
         }
         try save(settings, to: directory.appendingPathComponent("wheel-large-retina.png"))
-        try settingsWindow(to: directory.appendingPathComponent("settings-window-retina.png"))
+        try settingsWindow(to: directory.appendingPathComponent("settings-window-retina.png"), editing: false)
+        try settingsWindow(to: directory.appendingPathComponent("settings-window-editing-retina.png"), editing: true)
         try movie(to: directory.appendingPathComponent("LoLPing-effects-demo.mov"))
         print("Visual snapshots and renderer demo saved: \(directory.path)")
     }
     /// Snapshots the real settings window offscreen, so the layout that ships can be
     /// reviewed without a screen recording permission or a second machine.
     private static func settingsWindow(to url: URL) throws {
+        try settingsWindow(to: url, editing: false)
+    }
+    /// Also snapshots the editing mode, which is otherwise only reachable by a click.
+    private static func settingsWindow(to url: URL, editing: Bool) throws {
         let size = CGSize(width: 1120, height: 880)
-        let hosting = NSHostingView(rootView: ControlView(model: AppModel()))
+        let hosting = NSHostingView(rootView: ControlView(model: AppModel(), startEditing: editing))
         hosting.frame = CGRect(origin: .zero, size: size)
         hosting.appearance = NSAppearance(named: .darkAqua)
         let window = NSWindow(contentRect: CGRect(origin: .zero, size: size),

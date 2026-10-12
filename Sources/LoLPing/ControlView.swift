@@ -11,14 +11,24 @@ private enum Palette {
 
 struct ControlView: View {
     @ObservedObject var model: AppModel
+    /// Only the offscreen self-check passes anything else; the app always opens in
+    /// view mode, where clicks audition instead of editing.
+    init(model: AppModel, startEditing: Bool = false) {
+        self.model = model
+        _isEditing = State(initialValue: startEditing)
+    }
     @State private var pointed: PingKind = .generic
-    @State private var editing: WheelEditTarget = .hub
+    /// Editing is opt-in: outside it, clicking only previews, never rewrites the
+    /// ring, so browsing signals can never change the configuration by accident.
+    @State private var isEditing = false
+    @State private var editTarget: WheelEditTarget = .hub
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     header
                     statusCard
+                    guideCard
                     settingsCard
                     paletteCard
                     footer
@@ -78,12 +88,13 @@ struct ControlView: View {
             HStack {
                 Text("轮盘预览").font(.system(size: 14, weight: .semibold))
                 Spacer()
-                Text("鼠标移入试方位 · 点一下试听").font(.system(size: 10)).foregroundStyle(Palette.secondary)
+                Text(isEditing ? "点扇区或圆心 = 选中要编辑的位置" : "点一下只试听 · 不改配置")
+                    .font(.system(size: 10)).foregroundStyle(isEditing ? Palette.gold : Palette.secondary)
             }
-            WheelPreview(order: model.wheelOrder, centreSignal: model.centreSignal, focus: editing) { target in
-                editing = target
-                model.preview(target == .hub ? model.centreSignal
-                                             : (model.wheelOrder.indices.contains(target.ringIndex) ? model.wheelOrder[target.ringIndex] : model.centreSignal))
+            WheelPreview(order: model.wheelOrder, centreSignal: model.centreSignal,
+                         focus: isEditing ? editTarget : nil) { target in
+                if isEditing { editTarget = target }
+                model.preview(signal(at: target))
             } onHover: { kind in
                 pointed = kind
             }
@@ -125,6 +136,17 @@ struct ControlView: View {
             Text("MAC EDITION").font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .tracking(2).foregroundStyle(Palette.gold)
         }
+    }
+    private var guideCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("怎么用").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.gold)
+            Text("1 · 按住 \(model.chord.symbols) 约 0.18 秒 → 移动鼠标选信号 → 松开任意一键发送（不选方向、直接松开就是「中央」那个信号）。")
+            Text("2 · 左边点任意信号或表情 = 试听并看落点动画，**不会**改动配置。右边圆盘也可以点，同样是试听。")
+            Text("3 · 想改轮盘排布：点「自定义轮盘」→ 点右边圆盘的方位（或圆心）→ 点左边格子放入 → 点「结束编辑」。")
+        }
+        .font(.system(size: 10)).foregroundStyle(Palette.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(14).card()
     }
     private var statusCard: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -209,88 +231,111 @@ struct ControlView: View {
     private var paletteCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                Text("放进去什么").font(.system(size: 14, weight: .semibold))
-                Text("正在编辑：\(focusedName)").font(.system(size: 11, weight: .medium)).foregroundStyle(Palette.gold)
-                Spacer()
-                Text("点右侧轮盘的扇区或圆心，切换要编辑的方位").font(.system(size: 10)).foregroundStyle(Palette.secondary)
-            }
-            HStack(spacing: 8) {
-                if let icon = Assets.icon(focusedSignal) {
-                    Image(nsImage: icon).resizable().interpolation(.high).frame(width: 24, height: 24)
+                Text(isEditing ? "自定义轮盘" : "试听信号与表情").font(.system(size: 14, weight: .semibold))
+                if isEditing {
+                    Text("正在编辑：\(focusedName)").font(.system(size: 11, weight: .medium)).foregroundStyle(Palette.gold)
                 }
-                Text("当前：\(focusedSignal.title)").font(.system(size: 11)).foregroundStyle(Palette.secondary)
                 Spacer()
-                Button("与下一个方位交换") { swapFocusedForward() }
-                    .buttonStyle(.bordered).controlSize(.small).disabled(editing == .hub)
-                Button("移除这个方位") { removeFocused() }
-                    .buttonStyle(.bordered).controlSize(.small)
-                    .disabled(editing == .hub || model.wheelOrder.count <= AppModel.minWheelSlots)
-                Button("添加一个方位") { model.addWheelSlot() }
-                    .buttonStyle(.bordered).controlSize(.small).disabled(model.unusedSignals.isEmpty)
-                Button("恢复默认排布") { model.resetWheelOrder() }.buttonStyle(.bordered).controlSize(.small)
+                if isEditing {
+                    Button("结束编辑") { isEditing = false }
+                        .buttonStyle(.borderedProminent).controlSize(.small)
+                        .help("退出编辑：之后点击只试听，不再改动配置")
+                    Button("恢复默认排布") { model.resetWheelOrder() }.buttonStyle(.bordered).controlSize(.small)
+                } else {
+                    Button {
+                        isEditing = true
+                    } label: {
+                        Label("自定义轮盘", systemImage: "slider.horizontal.3")
+                    }
+                    .buttonStyle(.borderedProminent).controlSize(.small)
+                    .help("进入编辑：点方位选位置，点格子放入信号或表情")
+                }
+            }
+            if isEditing {
+                HStack(spacing: 8) {
+                    if let icon = Assets.icon(focusedSignal) {
+                        Image(nsImage: icon).resizable().interpolation(.high).frame(width: 22, height: 22)
+                    }
+                    Text("\(focusedName) 当前：\(focusedSignal.title)").font(.system(size: 11)).foregroundStyle(Palette.secondary)
+                    Spacer(minLength: 0)
+                    Button("与下一个方位交换") { swapFocusedForward() }
+                        .buttonStyle(.bordered).controlSize(.small).disabled(editTarget == .hub)
+                    Button("移除这个方位") { removeFocused() }
+                        .buttonStyle(.bordered).controlSize(.small)
+                        .disabled(editTarget == .hub || model.wheelOrder.count <= AppModel.minWheelSlots)
+                    Button("添加一个方位") { model.addWheelSlot() }
+                        .buttonStyle(.bordered).controlSize(.small).disabled(model.unusedSignals.isEmpty)
+                }
+                Text("编辑中：点右边圆盘的扇区或圆心切换位置，再点下面的格子放入；点「结束编辑」收工。")
+                    .font(.system(size: 10)).foregroundStyle(Palette.gold.opacity(0.85))
+            } else {
+                Text("下面是全部 \(PingKind.ring.count) 个可选信号：点一下只试听（放动画 + 出声），不会改动配置。要改轮盘排布请点右上角「自定义轮盘」。")
+                    .font(.system(size: 10)).foregroundStyle(Palette.secondary)
             }
             tileRow("游戏信号", kinds: PingKind.alerts + [PingKind.generic])
             tileRow("表情（\(PingKind.emotes.count) 个）", kinds: PingKind.emotes)
-            Text("共 \(model.wheelOrder.count) 个方位（最少 \(AppModel.minWheelSlots) 个）· 缩略图就是放进去的样子，点一下即放入并试听")
-                .font(.system(size: 10)).foregroundStyle(Palette.secondary)
         }.padding(16).card()
     }
 
+    /// Only while editing does a tile show "this is what the focused slot holds".
+    private func highlighted(_ kind: PingKind) -> Bool { isEditing && kind == focusedSignal }
     private func tileRow(_ title: String, kinds: [PingKind]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.secondary)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
                 ForEach(kinds) { kind in
-                    Button { assign(kind) } label: {
+                    Button { choose(kind) } label: {
                         VStack(spacing: 3) {
                             if let icon = Assets.icon(kind) {
                                 Image(nsImage: icon).resizable().interpolation(.high).frame(width: 34, height: 34)
                             }
                             Text(kind.title).font(.system(size: 8)).lineLimit(1)
-                                .foregroundStyle(kind == focusedSignal ? Palette.gold : Palette.secondary)
+                                .foregroundStyle(highlighted(kind) ? Palette.gold : Palette.secondary)
                         }
                         .frame(maxWidth: .infinity).frame(height: 60)
-                        .background(kind == focusedSignal ? Palette.gold.opacity(0.16) : Color.white.opacity(0.035),
+                        .background(highlighted(kind) ? Palette.gold.opacity(0.16) : Color.white.opacity(0.035),
                                     in: RoundedRectangle(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(kind == focusedSignal ? Palette.gold.opacity(0.7) : Color.white.opacity(0.05), lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(highlighted(kind) ? Palette.gold.opacity(0.7) : Color.white.opacity(0.05), lineWidth: 1))
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help(kind.title)
-                    .accessibilityLabel("把\(kind.title)放入\(focusedName)")
+                    .accessibilityLabel(isEditing ? "把\(kind.title)放入\(focusedName)" : "试听\(kind.title)")
                 }
             }
         }
     }
 
     private var focusedName: String {
-        switch editing {
+        switch editTarget {
         case .hub: return "中央"
         case .ring(let index): return compassLabel(index)
         }
     }
-    private var focusedSignal: PingKind {
-        switch editing {
+    private var focusedSignal: PingKind { signal(at: editTarget) }
+    private func signal(at target: WheelEditTarget) -> PingKind {
+        switch target {
         case .hub: return model.centreSignal
         case .ring(let index): return model.wheelOrder.indices.contains(index) ? model.wheelOrder[index] : model.centreSignal
         }
     }
-    /// Putting a signal somewhere and hearing it are the same click.
-    private func assign(_ kind: PingKind) {
-        switch editing {
+    /// Outside edit mode a click is only an audition; inside it also writes.
+    private func choose(_ kind: PingKind) {
+        guard isEditing else { model.preview(kind); return }
+        switch editTarget {
         case .hub: model.centreSignal = kind
         case .ring(let index): model.setWheelSlot(index, to: kind)
         }
         model.preview(kind)
     }
     private func swapFocusedForward() {
-        guard case .ring(let index) = editing else { return }
+        guard case .ring(let index) = editTarget else { return }
         model.rotateWheelSlot(index, by: 1)
     }
     private func removeFocused() {
-        guard case .ring(let index) = editing else { return }
+        guard case .ring(let index) = editTarget else { return }
         model.removeWheelSlot(at: index)
-        editing = .hub
+        editTarget = .hub
     }
     private var footer: some View {
         VStack(alignment: .leading, spacing: 10) {
