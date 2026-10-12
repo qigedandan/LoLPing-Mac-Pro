@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import PingCore
+import SwiftUI
 
 /// Captures this app's own renderer, not the desktop. Does not request screen
 /// recording permission, create input taps, or alter the user's preferences.
@@ -99,9 +100,30 @@ enum VisualChecks {
             }
         }
         try save(settings, to: directory.appendingPathComponent("wheel-large-retina.png"))
+        try settingsWindow(to: directory.appendingPathComponent("settings-window-retina.png"))
         try movie(to: directory.appendingPathComponent("LoLPing-effects-demo.mov"))
         print("Visual snapshots and renderer demo saved: \(directory.path)")
     }
+    /// Snapshots the real settings window offscreen, so the layout that ships can be
+    /// reviewed without a screen recording permission or a second machine.
+    private static func settingsWindow(to url: URL) throws {
+        let size = CGSize(width: 1120, height: 880)
+        let hosting = NSHostingView(rootView: ControlView(model: AppModel()))
+        hosting.frame = CGRect(origin: .zero, size: size)
+        hosting.appearance = NSAppearance(named: .darkAqua)
+        let window = NSWindow(contentRect: CGRect(origin: .zero, size: size),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = hosting
+        window.layoutIfNeeded()
+        hosting.layoutSubtreeIfNeeded()
+        guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else {
+            throw NSError(domain: "VisualChecks", code: 5, userInfo: [NSLocalizedDescriptionKey: "settings snapshot failed"])
+        }
+        hosting.cacheDisplay(in: hosting.bounds, to: rep)
+        try save(rep, to: url)
+        window.contentView = nil
+    }
+
     private static func checkEffectLifecycle() throws {
         let size = CGSize(width: 220, height: 220)
         func pixels(_ rep: NSBitmapImageRep) -> Data {

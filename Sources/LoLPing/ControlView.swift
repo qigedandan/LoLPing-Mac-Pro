@@ -13,21 +13,102 @@ struct ControlView: View {
     @ObservedObject var model: AppModel
     @State private var pointed: PingKind = .generic
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                header
-                statusCard
-                settingsCard
-                wheelCard
-                previewCard
-                emoteCard
-                footer
-            }.padding(26)
+        HStack(alignment: .top, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                    statusCard
+                    settingsCard
+                    wheelCard
+                    signalCard
+                    emoteCard
+                    footer
+                }.padding(26)
+            }
+            sidePreview
         }
         .background(Palette.background)
         .preferredColorScheme(.dark)
         .tint(Palette.gold)
-        .frame(minWidth: 700, minHeight: 640)
+        .frame(minWidth: 1040, minHeight: 700)
+    }
+
+    /// Everything previewable lives here, outside the scroll view, so browsing the
+    /// long emote list never scrolls the preview away.
+    private var sidePreview: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            effectCard
+            wheelCardPreview
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 26).padding(.trailing, 26)
+        .frame(width: 372)
+    }
+
+    private var effectCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("信号预览").font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Text(model.previewVisible ? model.previewKind.title : "点信号或表情试听")
+                    .font(.system(size: 10)).foregroundStyle(Palette.secondary)
+            }
+            ZStack {
+                RoundedRectangle(cornerRadius: 12).fill(Palette.background)
+                PreviewGrid().stroke(Palette.gold.opacity(0.06), lineWidth: 0.5)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                if model.previewVisible {
+                    EffectPreview(kind: model.previewKind, scale: model.scale, token: model.previewToken)
+                        .allowsHitTesting(false)
+                } else {
+                    VStack(spacing: 7) {
+                        Image(systemName: "cursorarrow.rays").font(.system(size: 23, weight: .light)).foregroundStyle(Palette.gold.opacity(0.65))
+                        Text("点选信号或表情，感受一下").font(.system(size: 11)).foregroundStyle(Palette.secondary)
+                    }
+                }
+            }.frame(height: max(150, 150*model.scale)).clipped()
+        }.padding(16).card()
+    }
+
+    /// The ring itself plus a 1:1 sample: the sample is drawn at the size the icon
+    /// really gets on screen, so the two sliders show their effect immediately.
+    private var wheelCardPreview: some View {
+        let sample = Assets.wheelIconSide(pointed, weight: 0, iconScale: CGFloat(model.iconScale)) * CGFloat(model.wheelScale)
+        let shown = min(sample, 300)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("轮盘预览").font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Text("鼠标移入试方位 · 点一下试听").font(.system(size: 10)).foregroundStyle(Palette.secondary)
+            }
+            WheelPreview(order: model.wheelOrder, centreSignal: model.centreSignal) { kind in
+                model.preview(kind)
+            } onHover: { kind in
+                pointed = kind
+            }
+            .frame(width: 300, height: 300)
+            HStack(spacing: 8) {
+                Text(pointed.isEmote || pointed == .generic ? pointed.title : "游戏信号 · " + pointed.title)
+                    .font(.system(size: 12, weight: .medium)).foregroundStyle(Color(nsColor: pointed.tint))
+                Spacer()
+                Text("\(WheelGeometry.compassLabel(forIndex: model.centreSignal.index(in: model.wheelOrder) ?? 0, count: max(model.wheelOrder.count, 1)))版式")
+                    .font(.system(size: 9)).foregroundStyle(Palette.secondary)
+            }
+            if let icon = Assets.icon(pointed) {
+                HStack(alignment: .bottom, spacing: 12) {
+                    Image(nsImage: icon).resizable().interpolation(.high)
+                        .frame(width: shown, height: shown)
+                        .frame(width: 300, height: 120, alignment: .bottomLeading)
+                        .clipped()
+                    Spacer(minLength: 0)
+                }
+            }
+            Text(sample <= 300
+                 ? "尺寸样本（1:1）：轮盘 \(Int(model.wheelScale*100))% × 图标 \(Int(model.iconScale*100))% → 环内约 \(Int(sample))pt"
+                 : "尺寸样本（截断）：实际约 \(Int(sample))pt，超出 300pt 放不下；轮盘 \(Int(model.wheelScale*100))% × 图标 \(Int(model.iconScale*100))%")
+                .font(.system(size: 9)).foregroundStyle(Palette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }.padding(16).card()
     }
     private var header: some View {
         HStack(spacing: 14) {
@@ -99,46 +180,30 @@ struct ControlView: View {
                         Label("轮盘大小", systemImage: "circle.dashed")
                         Spacer(); Text("\(Int(model.wheelScale*100))%")
                     }.font(.system(size: 11)).foregroundStyle(Palette.secondary)
-                    Slider(value: $model.wheelScale, in: 0.75...2.5, step: 0.05).accessibilityLabel("轮盘大小")
+                    Slider(value: $model.wheelScale, in: 0.5...4, step: 0.05).accessibilityLabel("轮盘大小")
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Label("图标大小", systemImage: "photo")
                         Spacer(); Text("\(Int(model.iconScale*100))%")
                     }.font(.system(size: 11)).foregroundStyle(Palette.secondary)
-                    Slider(value: $model.iconScale, in: 0.8...1.8, step: 0.05).accessibilityLabel("图标大小")
+                    Slider(value: $model.iconScale, in: 0.8...2.5, step: 0.05).accessibilityLabel("图标大小")
                 }
             }
-            Text("轮盘大小同时决定中央「普通信号」判定圈的大小；图标大小只影响轮盘里的图标。表情（比如弱爆）默认就比线稿信号画得大，看不清就再放大这两项。")
+            Text("轮盘大小 0.5×–4×，同时决定中央判定圈；图标大小 0.8×–2.5×，只影响轮盘里的图标。表情（比如弱爆）默认就比线稿信号画得大，看不清就再放大这两项——右侧「尺寸样本」是环内真实大小。")
                 .font(.system(size: 10)).foregroundStyle(Palette.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Text("按住 0.18 秒 → 移动选择 → 松开发送　 ·　 Esc / 右键取消")
                 .font(.system(size: 10)).foregroundStyle(Palette.secondary)
         }.padding(16).card()
     }
-    private var previewCard: some View {
+    private var signalCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("游戏信号试用").font(.system(size: 14, weight: .semibold))
+                Text("游戏信号").font(.system(size: 14, weight: .semibold))
                 Spacer()
-                Text("仅在此区域预览 · 无需授权").font(.system(size: 10)).foregroundStyle(Palette.secondary)
+                Text("点一下在右侧预览并试听 · 无需授权").font(.system(size: 10)).foregroundStyle(Palette.secondary)
             }
-            ZStack {
-                RoundedRectangle(cornerRadius: 12).fill(Palette.background)
-                PreviewGrid().stroke(Palette.gold.opacity(0.06), lineWidth: 0.5)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                if model.previewVisible {
-                    EffectPreview(kind: model.previewKind, scale: model.scale, token: model.previewToken)
-                        .allowsHitTesting(false)
-                } else {
-                    VStack(spacing: 7) {
-                        Image(systemName: "cursorarrow.rays").font(.system(size: 23, weight: .light)).foregroundStyle(Palette.gold.opacity(0.65))
-                        Text("点选下方信号，感受一下").font(.system(size: 11)).foregroundStyle(Palette.secondary)
-                    }
-                }
-                VStack { Spacer(); HStack { Spacer(); Text(model.previewVisible ? model.previewKind.title : "")
-                    .font(.system(size: 10)).foregroundStyle(Palette.secondary).padding(10) } }
-            }.frame(height: max(120, 120*model.scale)).clipped()
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                 ForEach(PingKind.alerts + [PingKind.generic]) { kind in
                     Button { model.preview(kind) } label: {
@@ -155,52 +220,47 @@ struct ControlView: View {
             }
         }.padding(16).card()
     }
+    /// 左上/正上 rather than slot numbers; a ring that is not eight slots would
+    /// repeat a compass name, so those get a small index suffix.
+    private func compassLabel(_ index: Int) -> String {
+        let name = WheelGeometry.compassLabel(forIndex: index, count: model.wheelOrder.count)
+        return model.wheelOrder.count == 8 ? name : "\(name)·\(index+1)"
+    }
     private var wheelCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("信号轮盘").font(.system(size: 14, weight: .semibold))
                 Spacer()
-                Text("第 1 位在正上方，顺时针排列").font(.system(size: 10)).foregroundStyle(Palette.secondary)
+                Text(model.wheelOrder.count == 8 ? "方位与游戏一致，顺时针排列" : "顺时针排列，第 1 个在正上方")
+                    .font(.system(size: 10)).foregroundStyle(Palette.secondary)
             }
             HStack(spacing: 8) {
-                Text("中央").font(.system(size: 11, design: .monospaced)).foregroundStyle(Palette.secondary)
-                    .frame(width: 32, alignment: .trailing)
+                Text("中央").font(.system(size: 11)).foregroundStyle(Palette.secondary)
+                    .frame(width: 40, alignment: .trailing)
                 if let icon = Assets.icon(model.centreSignal) { Image(nsImage: icon).resizable().frame(width: 20, height: 20) }
                 Picker("中央信号", selection: $model.centreSignal) {
                     Section("游戏信号") { ForEach(PingKind.alerts + [PingKind.generic]) { Text($0.title).tag($0) } }
                     Section("表情") { ForEach(PingKind.emotes) { Text($0.title).tag($0) } }
                 }.labelsHidden().frame(width: 210).accessibilityLabel("中央信号")
-                Text("不选方向、直接松开时发送的信号").font(.system(size: 10)).foregroundStyle(Palette.secondary)
+                Text("不选方向、直接松开时发送的信号 · 正中央").font(.system(size: 10)).foregroundStyle(Palette.secondary)
             }
-            HStack(alignment: .top, spacing: 16) {
-                VStack(spacing: 6) {
-                    WheelPreview(order: model.wheelOrder, centreSignal: model.centreSignal) { kind in
-                        model.preview(kind)
-                    } onHover: { kind in
-                        pointed = kind
-                    }
-                    .frame(width: 240, height: 240)
-                    Text(pointed.isEmote || pointed == .generic ? pointed.title : "游戏信号 · " + pointed.title)
-                        .font(.system(size: 11)).foregroundStyle(Color(nsColor: pointed.tint))
-                    Text("把鼠标移到圆盘上试位置，点一下试听该信号").font(.system(size: 9)).foregroundStyle(Palette.secondary)
-                }
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(Array(model.wheelOrder.enumerated()), id: \.offset) { index, kind in
-                        HStack(spacing: 8) {
-                            Text("\(index+1)").font(.system(size: 11, design: .monospaced)).foregroundStyle(Palette.secondary)
-                                .frame(width: 14, alignment: .trailing)
-                            if let icon = Assets.icon(kind) { Image(nsImage: icon).resizable().frame(width: 20, height: 20) }
-                            Picker("位置 \(index+1)", selection: Binding(get: { kind }, set: { model.setWheelSlot(index, to: $0) })) {
-                                Section("游戏信号") { ForEach(PingKind.alerts) { Text($0.title).tag($0) } }
-                                Section("表情") { ForEach(PingKind.emotes) { Text($0.title).tag($0) } }
-                            }.labelsHidden().frame(width: 210).accessibilityLabel("第 \(index+1) 个位置的信号")
-                            Spacer(minLength: 0)
-                            Button { model.rotateWheelSlot(index, by: 1) } label: { Image(systemName: "arrow.down") }
-                                .buttonStyle(.borderless).help("与下一个位置交换").accessibilityLabel("第 \(index+1) 位下移")
-                            Button { model.removeWheelSlot(at: index) } label: { Image(systemName: "minus.circle") }
-                                .buttonStyle(.borderless).disabled(model.wheelOrder.count <= AppModel.minWheelSlots)
-                                .help("移除这个位置").accessibilityLabel("移除第 \(index+1) 位")
-                        }
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(model.wheelOrder.enumerated()), id: \.offset) { index, kind in
+                    HStack(spacing: 8) {
+                        Text(compassLabel(index))
+                            .font(.system(size: 11, weight: .medium)).foregroundStyle(Palette.gold)
+                            .frame(width: 40, alignment: .trailing)
+                        if let icon = Assets.icon(kind) { Image(nsImage: icon).resizable().frame(width: 20, height: 20) }
+                        Picker(compassLabel(index), selection: Binding(get: { kind }, set: { model.setWheelSlot(index, to: $0) })) {
+                            Section("游戏信号") { ForEach(PingKind.alerts) { Text($0.title).tag($0) } }
+                            Section("表情") { ForEach(PingKind.emotes) { Text($0.title).tag($0) } }
+                        }.labelsHidden().frame(width: 210).accessibilityLabel(compassLabel(index) + "的信号")
+                        Spacer(minLength: 0)
+                        Button { model.rotateWheelSlot(index, by: 1) } label: { Image(systemName: "arrow.down") }
+                            .buttonStyle(.borderless).help("与下一个方位交换").accessibilityLabel(compassLabel(index) + "下移")
+                        Button { model.removeWheelSlot(at: index) } label: { Image(systemName: "minus.circle") }
+                            .buttonStyle(.borderless).disabled(model.wheelOrder.count <= AppModel.minWheelSlots)
+                            .help("移除这个方位").accessibilityLabel("移除" + compassLabel(index))
                     }
                 }
             }

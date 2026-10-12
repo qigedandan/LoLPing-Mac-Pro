@@ -66,8 +66,8 @@ final class AppModel: ObservableObject {
         chord = TriggerChord(rawValue: defaults.string(forKey: "triggerChord") ?? "") ?? .controlOptionCommand
         volume = defaults.object(forKey: "volume") == nil ? 0.55 : min(max(defaults.double(forKey: "volume"), 0), 1)
         scale = defaults.object(forKey: "effectScale") == nil ? 1 : min(max(defaults.double(forKey: "effectScale"), 0.75), 1.5)
-        wheelScale = defaults.object(forKey: "wheelScale") == nil ? 1 : min(max(defaults.double(forKey: "wheelScale"), 0.75), 2.5)
-        iconScale = defaults.object(forKey: "iconScale") == nil ? 1 : min(max(defaults.double(forKey: "iconScale"), 0.8), 1.8)
+        wheelScale = defaults.object(forKey: "wheelScale") == nil ? 1 : min(max(defaults.double(forKey: "wheelScale"), 0.5), 4)
+        iconScale = defaults.object(forKey: "iconScale") == nil ? 1 : min(max(defaults.double(forKey: "iconScale"), 0.8), 2.5)
         centreSignal = PingKind(rawValue: defaults.string(forKey: "centreSignal") ?? "") ?? .generic
         wheelOrder = Self.loadWheelOrder(from: defaults)
         input.onAction = { [weak self] action in self?.handle(action) }

@@ -253,6 +253,14 @@ public enum WheelGeometry {
     public static func step(_ count: Int) -> CGFloat { 2 * .pi / CGFloat(max(count, 1)) }
     /// Clockwise-from-north angle of a slot centre, matching `direction(at:)`.
     public static func angle(forIndex index: Int, count: Int) -> CGFloat { CGFloat(index) * step(count) }
+    /// Compass name of a slot, so settings can talk about 左上/正上 instead of
+    /// slot numbers. Rings that are not eight slots reuse the nearest name.
+    public static func compassLabel(forIndex index: Int, count: Int) -> String {
+        let names = ["正上", "右上", "正右", "右下", "正下", "左下", "正左", "左上"]
+        guard count > 0 else { return "" }
+        let slot = Int((angle(forIndex: index, count: count) / (.pi / 4)).rounded()) % 8
+        return names[(slot + 8) % 8]
+    }
 
     /// Clockwise from north; nil in the ordinary Ping region.
     public static func direction(at point: CGPoint, center: CGPoint, deadZone: CGFloat) -> CGFloat? {

@@ -71,6 +71,14 @@ final class GestureTests {
         XCTAssertEqual(machine.moved(to: CGPoint(x: 700, y: 400)), [.hover(.push, angle: .pi/2)])
         XCTAssertEqual(machine.flagsChanged([], at: anchor, otherInputHeld: false), [.dismiss, .commit(.push, anchor)])
     }
+    func testCompassLabelsMatchTheRingOrder() {
+        for (index, name) in ["正上", "右上", "正右", "右下", "正下", "左下", "正左", "左上"].enumerated() {
+            XCTAssertEqual(WheelGeometry.compassLabel(forIndex: index, count: 8), name)
+        }
+        XCTAssertEqual(WheelGeometry.compassLabel(forIndex: 0, count: 3), "正上")
+        XCTAssertEqual(WheelGeometry.compassLabel(forIndex: 8, count: 9), "左上")
+        XCTAssertEqual(WheelGeometry.compassLabel(forIndex: 0, count: 0), "")
+    }
     func testCentreSignalCanBeAnySignal() {
         let machine = GestureMachine()
         machine.centreSignal = .unworthyCn
@@ -214,6 +222,7 @@ enum Checks {
         let scenarios: [(String, () -> Void)] = [
             ("扇区判定与中央区域", test.testSectorSelectionAndCentralDeadZone),
             ("自定义轮盘驱动悬停与发送", test.testConfiguredRingDrivesHoverAndCommit),
+            ("方位名称与顺序一致", test.testCompassLabelsMatchTheRingOrder),
             ("中央信号可自定义", test.testCentreSignalCanBeAnySignal),
             ("轮盘排布持久化解析", test.testSavedRingLayoutSurvivesPersistence),
             ("短按不触发", test.testShortPressNeverPingsAndLateTimerDoesNothing),
